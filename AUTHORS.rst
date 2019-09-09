@@ -1,9 +1,11 @@
 Authors
 ======
 
-LEAD ENGINEER:
-RESEARCHER:
-DATA ANALYST:
+LEAD ENGINEER: Kate Wilson
+RESEARCHER: David Bernotas
+DATA ANALYST: Serena Santoni
 
 Contributors
 -------------
+
+James Collins

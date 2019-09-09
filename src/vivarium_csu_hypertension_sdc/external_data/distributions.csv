@@ -1,0 +1,78 @@
+,,,,,,,
+Treatment profile,,,,,prob(Rx|HTN),,
+,,,,,,,
+drug,mean,sd,location,,mean,sd,
+ACEi,0.107,0.0115,china,,0.615,0.0375,italy
+ARB,0.115,0.0165,china,,0.407,0.0407,china
+CCB,0.385,0.013,china,,0.597,0.1335,mexico
+Beta-blocker,0.096,0.038,china,,0.499,0.0499,russia
+Diuretic,0.099,0.0175,china,,0.611,0.0611,south korea
+ACEi + ARB (single pill,0.0001,5E-05,china,,,,
+ARB + CCB (single pill),0.0045,0.00175,china,,,,
+ACEi + diuretic (single pill),0.006,0,china,,prob(control|Rx),,
+ARB + diuretic (single pill),0.0215,0.00725,china,,,,
+CCB + diuretic (single pill),0,0,china,,mean,sd,
+CCB + beta-blocker (single pill),0.16575,0.082625,china,,0.285,0.0325,italy
+ACEi + CCB (single pill),0.00025,0.000125,china,,0.153,0.0153,china
+Beta-blocker + diuretic (single pill),0,0,china,,0.374,0.0374,mexico
+ARB + CCB + diuretic,0,0,china,,0.166,0.0166,russia
+,,,,,0.693,0.0693,south korea
+ACEi,0.2085,0.03425,italy,,,,
+ARB,0.056,0.028,italy,,,,
+CCB,0.156,0.0155,italy,,prob(HTN),,
+Beta-blocker,0.1665,0.03825,italy,,,,
+Diuretic,0.113,0.015,italy,,mean,sd,
+ACEi + ARB (single pill),0.0005,0.00025,italy,,0.308,0.0308,italy
+ARB + CCB (single pill),0.0075,0.00375,italy,,0.232,0.0232,china
+ACEi + diuretic (single pill),0.176,0.0545,italy,,0.2805,0.01725,mexico
+ARB + diuretic (single pill),0.05,0.025,italy,,0.505,0.0525,russia
+CCB + beta-blocker (single pill),0.0005,0.00025,italy,,0.285,0.0285,south korea
+ACEi + CCB (single pill),0.0515,0.01375,italy,,,,
+ACEi + CCB + diuretic,0.1415,0.06775,italy,,,,
+Beta-blocker + diuretic (single pill),0.0105,0.00525,italy,,prob(adverse events),,
+ARB + CCB + diuretic,0,0,italy,,,,
+,,,,,mean,sd,
+ACEi,0.3295,0.07625,mexico,,0.137333333333333,0.03069563848859,all locaitons
+ARB,0.1895,0.03525,mexico,,,,all drugs
+CCB,0.092,0.022,mexico,,,,
+Beta-blocker,0.1755,0.01225,mexico,,prob(therapeutic inertia),,
+Diuretic,0.126,0.012,mexico,,,,
+ACEi + ARB (single pill),0.0015,0.00075,mexico,,mean,sd,
+ARB + CCB (single pill),0.0155,0.00775,mexico,,0.136,0.0136,all locaitons
+ACEi + diuretic (single pill),0.0025,0.00125,mexico,,,,
+ARB + diuretic (single pill),0.047,0.0235,mexico,,,,
+CCB + diuretic (single pill),0.00015,7.5E-05,mexico,,prob(adherent|multiple pills),,
+CCB + beta-blocker (single pill),0.0025,0.00125,mexico,,,,
+ACEi + CCB (single pill),0.001,0.0005,mexico,,mean,sd,
+Beta-blocker + diuretic (single pill),0.0095,0.00475,mexico,,0.5,0.174441326951765,age < 45
+ARB + CCB + diuretic,0,0,mexico,,0.69,0.174441326951765,age 45-60
+,,,,,0.88,0.174441326951765,age > 60
+ACEi,0.33,0.0375,russia,,,,
+ARB,0.0495,0.02175,russia,,,,
+CCB,0.12,0.005,russia,,prob(adherent|FDC),,
+Beta-blocker,0.2665,0.00325,russia,,,,
+Diuretic,0.183,0.0115,russia,,mean,sd,
+ACEi + ARB (single pill),5E-05,2.5E-05,russia,,0.629,0.200576111610263,age < 45
+ARB + CCB (single pill),0.004,0.002,russia,,0.77,0.200576111610263,age 45-60
+ACEi + diuretic (single pill),0.0425,0.00725,russia,,0.911,0.200576111610263,age > 60
+ARB + diuretic (single pill),0.0215,0.01075,russia,,,,
+CCB + diuretic (single pill),0.0001,5E-05,russia,,,,
+CCB + beta-blocker (single pill),0.0004,0.0002,russia,,,,
+ACEi + CCB (single pill),0.0055,0.00275,russia,,,,
+Beta-blocker + diuretic (single pill),0.0295,0.01125,russia,,,,
+ARB + CCB + diuretic,0,0,russia,,,,
+,,,,,,,
+ACEi,0.0135,0.00125,s. korea,,,,
+ARB,0.2035,0.01475,s. korea,,,,
+CCB,0.2305,0.00125,s. korea,,,,
+Beta-blocker,0.1035,0.03275,s. korea,,,,
+Diuretic,0.064,0.021,s. korea,,,,
+ACEi + ARB (single pill),0.0005,0.00025,s. korea,,,,
+ARB + CCB (single pill),0.25,0.0285,s. korea,,,,
+ACEi + diuretic (single pill),0.0001,5E-05,s. korea,,,,
+ARB + diuretic (single pill),0.1255,0.01425,s. korea,,,,
+CCB + diuretic (single pill),0,0,s. korea,,,,
+CCB + beta-blocker (single pill),1.5E-05,7.5E-06,s. korea,,,,
+ACEi + CCB (single pill),0.0002,0.0001,s. korea,,,,
+Beta-blocker + diuretic (single pill),0.0015,0.00075,s. korea,,,,
+ARB + CCB + diuretic,0.00015,7.5E-05,s. korea,,,,
