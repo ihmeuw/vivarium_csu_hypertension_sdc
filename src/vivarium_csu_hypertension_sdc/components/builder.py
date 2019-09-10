@@ -258,7 +258,7 @@ def write_hypertension_medication_data(artifact, location):
         },
         'therapy_category': {
             'seed_columns': ['location', 'therapy_category'],
-            'distribution': None,  # TODO: figure out what distribution this should be and what the sd actually is
+            'distribution': 'beta',
         },
         'treatment_coverage': {
             'seed_columns': ['location', 'measure'],
@@ -279,6 +279,9 @@ def write_hypertension_medication_data(artifact, location):
             data.location = location
 
         data = utilities.sort_hierarchical_data(utilities.reshape(data))
+
+        if k == 'therapy_category':  # normalize so that sum of all categories = 1
+            data = data.divide(data.sum(axis=0), axis=1)
 
         key = f'health_technology.hypertension_medication.{k}'
         write(artifact, key, data)
