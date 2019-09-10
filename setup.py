@@ -35,6 +35,8 @@ if __name__ == "__main__":
         'pytest',
         'pytest-mock',
         'pyyaml',
+        'click',
+        'loguru',
     ]
 
     setup(
@@ -54,6 +56,11 @@ if __name__ == "__main__":
         include_package_data=True,
 
         install_requires=install_requirements,
+
+        entry_points='''
+               [console_scripts]
+               pcalculate_proportion_hypertensive=vivarium_csu_hypertension_sdc.external_data.cli:pcalculate_proportion_hypertensive
+        ''',
 
         zip_safe=False,
     )
