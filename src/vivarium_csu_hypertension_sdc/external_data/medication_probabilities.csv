@@ -1,0 +1,71 @@
+location,pill_category,ace_inhibitors,angiotensin_ii_blockers,calcium_channel_blockers,thiazide_type_diuretics,beta_blockers,drug,mean,sd
+China,multiple,1,0,0,0,0,ACEi,0.107,0.0115
+China,multiple,0,1,0,0,0,ARB,0.115,0.0165
+China,multiple,0,0,1,0,0,CCB,0.385,0.013
+China,multiple,0,0,0,0,1,Beta-blocker,0.096,0.038
+China,multiple,0,0,0,1,0,Diuretic,0.099,0.0175
+China,single,1,1,0,0,0,ACEi + ARB (single pill,0.0001,5.00E-05
+China,single,1,0,1,0,0,ARB + CCB (single pill),0.0045,0.00175
+China,single,1,0,0,1,0,ACEi + diuretic (single pill),0.006,0
+China,single,0,1,0,1,0,ARB + diuretic (single pill),0.0215,0.00725
+China,single,0,0,1,1,0,CCB + diuretic (single pill),0,0
+China,single,0,0,1,0,1,CCB + beta-blocker (single pill),0.16575,0.082625
+China,single,1,0,1,0,0,ACEi + CCB (single pill),0.00025,0.000125
+China,single,0,0,0,1,1,Beta-blocker + diuretic (single pill),0,0
+China,single,0,1,1,1,0,ARB + CCB + diuretic,0,0
+Italy,multiple,1,0,0,0,0,ACEi,0.2085,0.03425
+Italy,multiple,0,1,0,0,0,ARB,0.056,0.028
+Italy,multiple,0,0,1,0,0,CCB,0.156,0.0155
+Italy,multiple,0,0,0,0,1,Beta-blocker,0.1665,0.03825
+Italy,multiple,0,0,0,1,0,Diuretic,0.113,0.015
+Italy,single,1,1,0,0,0,ACEi + ARB (single pill),0.0005,0.00025
+Italy,single,1,0,1,0,0,ARB + CCB (single pill),0.0075,0.00375
+Italy,single,1,0,0,1,0,ACEi + diuretic (single pill),0.176,0.0545
+Italy,single,0,1,0,1,0,ARB + diuretic (single pill),0.05,0.025
+Italy,single,0,0,1,1,0,CCB + beta-blocker (single pill),0.0005,0.00025
+Italy,single,0,0,1,0,1,ACEi + CCB (single pill),0.0515,0.01375
+Italy,single,1,0,1,0,0,ACEi + CCB + diuretic,0.1415,0.06775
+Italy,single,0,0,0,1,1,Beta-blocker + diuretic (single pill),0.0105,0.00525
+Italy,single,0,1,1,1,0,ARB + CCB + diuretic,0,0
+Mexico,multiple,1,0,0,0,0,ACEi,0.3295,0.07625
+Mexico,multiple,0,1,0,0,0,ARB,0.1895,0.03525
+Mexico,multiple,0,0,1,0,0,CCB,0.092,0.022
+Mexico,multiple,0,0,0,0,1,Beta-blocker,0.1755,0.01225
+Mexico,multiple,0,0,0,1,0,Diuretic,0.126,0.012
+Mexico,single,1,1,0,0,0,ACEi + ARB (single pill),0.0015,0.00075
+Mexico,single,1,0,1,0,0,ARB + CCB (single pill),0.0155,0.00775
+Mexico,single,1,0,0,1,0,ACEi + diuretic (single pill),0.0025,0.00125
+Mexico,single,0,1,0,1,0,ARB + diuretic (single pill),0.047,0.0235
+Mexico,single,0,0,1,1,0,CCB + diuretic (single pill),0.00015,7.50E-05
+Mexico,single,0,0,1,0,1,CCB + beta-blocker (single pill),0.0025,0.00125
+Mexico,single,1,0,1,0,0,ACEi + CCB (single pill),0.001,0.0005
+Mexico,single,0,0,0,1,1,Beta-blocker + diuretic (single pill),0.0095,0.00475
+Mexico,single,0,1,1,1,0,ARB + CCB + diuretic,0,0
+Russian Federation,multiple,1,0,0,0,0,ACEi,0.33,0.0375
+Russian Federation,multiple,0,1,0,0,0,ARB,0.0495,0.02175
+Russian Federation,multiple,0,0,1,0,0,CCB,0.12,0.005
+Russian Federation,multiple,0,0,0,0,1,Beta-blocker,0.2665,0.00325
+Russian Federation,multiple,0,0,0,1,0,Diuretic,0.183,0.0115
+Russian Federation,single,1,1,0,0,0,ACEi + ARB (single pill),5.00E-05,2.50E-05
+Russian Federation,single,1,0,1,0,0,ARB + CCB (single pill),0.004,0.002
+Russian Federation,single,1,0,0,1,0,ACEi + diuretic (single pill),0.0425,0.00725
+Russian Federation,single,0,1,0,1,0,ARB + diuretic (single pill),0.0215,0.01075
+Russian Federation,single,0,0,1,1,0,CCB + diuretic (single pill),0.0001,5.00E-05
+Russian Federation,single,0,0,1,0,1,CCB + beta-blocker (single pill),0.0004,0.0002
+Russian Federation,single,1,0,1,0,0,ACEi + CCB (single pill),0.0055,0.00275
+Russian Federation,single,0,0,0,1,1,Beta-blocker + diuretic (single pill),0.0295,0.01125
+Russian Federation,single,0,1,1,1,0,ARB + CCB + diuretic,0,0
+South Korea,multiple,1,0,0,0,0,ACEi,0.0135,0.00125
+South Korea,multiple,0,1,0,0,0,ARB,0.2035,0.01475
+South Korea,multiple,0,0,1,0,0,CCB,0.2305,0.00125
+South Korea,multiple,0,0,0,0,1,Beta-blocker,0.1035,0.03275
+South Korea,multiple,0,0,0,1,0,Diuretic,0.064,0.021
+South Korea,single,1,1,0,0,0,ACEi + ARB (single pill),0.0005,0.00025
+South Korea,single,1,0,1,0,0,ARB + CCB (single pill),0.25,0.0285
+South Korea,single,1,0,0,1,0,ACEi + diuretic (single pill),0.0001,5.00E-05
+South Korea,single,0,1,0,1,0,ARB + diuretic (single pill),0.1255,0.01425
+South Korea,single,0,0,1,1,0,CCB + diuretic (single pill),0,0
+South Korea,single,0,0,1,0,1,CCB + beta-blocker (single pill),1.50E-05,7.50E-06
+South Korea,single,1,0,1,0,0,ACEi + CCB (single pill),0.0002,0.0001
+South Korea,single,0,0,0,1,1,Beta-blocker + diuretic (single pill),0.0015,0.00075
+South Korea,single,0,1,1,1,0,ARB + CCB + diuretic,0.00015,7.50E-05
