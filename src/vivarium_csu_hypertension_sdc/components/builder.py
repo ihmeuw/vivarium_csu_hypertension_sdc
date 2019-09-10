@@ -23,6 +23,10 @@ def build_artifact(path, location):
     write_stroke_data(artifact, location, 'subarachnoid_hemorrhage', 18731, 18733)
     write_stroke_data(artifact, location, 'intracerebral_hemorrhage', 9311, 10836)
 
+
+def build_treatment_artifact(path, location):
+    artifact = create_new_artifact(path, location)
+
     write_proportion_hypertensive(artifact, location)
 
 
@@ -233,4 +237,4 @@ def append_ckd_rr(data, ckd_paf):
 def write_proportion_hypertensive(artifact, location):
     data = pd.read_hdf(HYPERTENSION_DATA_FOLDER / f'{location}.hdf', HYPERTENSION_HDF_KEY)
     key = f'risk_factor.high_systolic_blood_pressure.{HYPERTENSION_HDF_KEY}'
-    artifact.write(key, data)
+    write(artifact, key, data)
