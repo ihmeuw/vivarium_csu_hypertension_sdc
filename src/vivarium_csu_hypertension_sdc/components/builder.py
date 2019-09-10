@@ -235,6 +235,7 @@ def append_ckd_rr(data, ckd_paf):
 
 
 def write_proportion_hypertensive(artifact, location):
+    location = location.replace(' ', '_').replace("'", "-").lower()
     data = pd.read_hdf(HYPERTENSION_DATA_FOLDER / f'{location}.hdf', HYPERTENSION_HDF_KEY)
     key = f'risk_factor.high_systolic_blood_pressure.{HYPERTENSION_HDF_KEY}'
     write(artifact, key, data)
