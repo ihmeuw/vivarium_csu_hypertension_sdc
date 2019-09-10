@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import hashlib
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
@@ -257,49 +258,54 @@ def write_hypertension_medication_data(artifact, location):
         },
         'therapy_category': {
             'seed_columns': ['location', 'therapy_category'],
-            'distribution': 'beta',  # TODO: verify that these are indeed beta distributions
+            'distribution': None,  # TODO: figure out what distribution this should be and what the sd actually is
         },
         'treatment_coverage': {
             'seed_columns': ['location', 'measure'],
             'distribution': 'beta',
         },
         'drug_efficacy': {
-            'seed_columns': ['location', 'drug'], # don't include dosage so all dosages of same drug will use same seeds
+            'seed_columns': ['location', 'drug'],  # don't include dosage so all dosages of same drug will use same seeds
             'distribution': 'normal',
         },
     }
 
-    for k, spec in external_data_specification:
-        data = load_external_data(k)
+    for k, spec in external_data_specification.items():
+        data = load_external_data(k, location)
         data = generate_draws(data, spec['seed_columns'], spec['distribution'])
 
-        if 'location' in data:
-            if set(data.location) == {'Global'}:
-                # do this post draw generation so all locations use the same draws if data is global
-                data.location = location
-            data = data.loc[data.location == location]
+        if set(data.location) == {'Global'}:
+            # do this post draw generation so all locations use the same draws if data is global
+            data.location = location
+
+        data = utilities.sort_hierarchical_data(utilities.reshape(data))
 
         key = f'health_technology.hypertension_medication.{k}'
         write(artifact, key, data)
 
 
 def generate_draws(data, seed_columns, distribution_type):
-    draws = []
-    for row in data.iterrows():
-        np.random.seed('_'.join(row[1][seed_columns]))
-        d = np.random.random(1000)
-        if distribution_type == 'normal':
-            dist = norm(loc=row[1]['mean'], scale=row[1]['sd'])
-        else:  # beta
-            from risk_distributions.risk_distributions import Beta
-            dist = Beta(mean=row[1]['mean'], sd=row[1]['sd'])
+    draws = pd.DataFrame(data=np.transpose(np.tile(data['mean'].values, (1000, 1))),
+                         columns=globals.DRAW_COLUMNS, index=data.index)
+    data = pd.concat([data, draws], axis=1)
 
-        draws.append(dist.ppf(d))
+    if distribution_type is not None:
+        for row in data.iterrows():
+            seed = str_to_seed('_'.join([str(s) for s in row[1][seed_columns]]))
+            np.random.seed(seed)
+            d = np.random.random(1000)
+            if distribution_type == 'normal':
+                dist = norm(loc=row[1]['mean'], scale=row[1]['sd'])
+            else:  # beta
+                from risk_distributions.risk_distributions import Beta
+                dist = Beta(mean=row[1]['mean'], sd=row[1]['sd'])
 
-    return pd.concat(data + draws, axis=1)
+            data.loc[row[0], globals.DRAW_COLUMNS] = dist.ppf(d)
+
+    return data.drop(columns=['mean', 'sd'])
 
 
-def load_external_data(file_key):
+def load_external_data(file_key, location):
     from vivarium_csu_hypertension_sdc import external_data
     data_dir = Path(external_data.__file__).parent
 
@@ -309,6 +315,8 @@ def load_external_data(file_key):
     df_obj = data.select_dtypes(['object'])
     data[df_obj.columns] = df_obj.apply(lambda x: x.str.strip())
 
+    data = data.loc[(data.location == location) | (data.location == 'Global')]
+
     if 'uncertainty_level' in data:  # convert upper/lower bounds to sd
         ci_width_map = {99: 2.58, 95: 1.96, 90: 1.65, 68: 1}
         ci_widths = data.uncertainty_level.map(lambda l: ci_width_map.get(l, 0) * 2)
@@ -316,3 +324,14 @@ def load_external_data(file_key):
         data = data.drop(columns=['uncertainty_level', 'upper_bound', 'lower_bound'])
 
     return data
+
+
+def str_to_seed(s):
+    """ Numpy random seed requires an int between 0 and 2**32 - 1 so we have to
+    do a little work to convert a string into something we can use as a seed.
+    Using hashlib instead of built-in hash because the built-in is
+    non-deterministic between runs.
+    """
+    hash_digest = hashlib.sha256(s.encode()).digest()
+    seed = int.from_bytes(hash_digest, 'big') % (2**32 - 1)
+    return seed
