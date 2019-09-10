@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pandas as pd
+
 from gbd_mapping import risk_factors
 from vivarium import Artifact
 from vivarium.framework.artifact import get_location_term
@@ -7,6 +9,8 @@ from vivarium_gbd_access import gbd
 from vivarium_inputs.data_artifact.loaders import loader
 from vivarium_inputs.data_artifact.utilities import split_interval
 from vivarium_inputs import utilities, globals, utility_data, core
+
+from vivarium_csu_hypertension_sdc.external_data.proportion_hypertensive import HYPERTENSION_DATA_FOLDER, HYPERTENSION_HDF_KEY
 
 
 def build_artifact(path, location):
@@ -18,6 +22,8 @@ def build_artifact(path, location):
     write_stroke_data(artifact, location, 'ischemic_stroke', 9310, 10837)
     write_stroke_data(artifact, location, 'subarachnoid_hemorrhage', 18731, 18733)
     write_stroke_data(artifact, location, 'intracerebral_hemorrhage', 9311, 10836)
+
+    write_proportion_hypertensive(artifact, location)
 
 
 def write_demographic_data(artifact, location):
@@ -222,3 +228,9 @@ def load_em_from_meid(meid, location):
 def append_ckd_rr(data, ckd_paf):
     # TODO
     return data
+
+
+def write_proportion_hypertensive(artifact, location):
+    data = pd.read_hdf(HYPERTENSION_DATA_FOLDER / f'{location}.hdf', HYPERTENSION_HDF_KEY)
+    key = f'risk_factor.high_systolic_blood_pressure.{HYPERTENSION_HDF_KEY}'
+    artifact.write(key, data)
