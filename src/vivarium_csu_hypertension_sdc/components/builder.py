@@ -278,6 +278,9 @@ def write_hypertension_medication_data(artifact, location):
             # do this post draw generation so all locations use the same draws if data is global
             data.location = location
 
+        if k == 'medication_probabilities':  # drop ACE + ARB single pill because not used
+            data = data.loc[~((data.ace_inhibitors == 1) & (data.angiotensin_ii_blockers == 1))]
+
         data = utilities.sort_hierarchical_data(utilities.reshape(data))
 
         if k == 'therapy_category':  # normalize so that sum of all categories = 1
