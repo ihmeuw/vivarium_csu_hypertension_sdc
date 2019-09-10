@@ -1,6 +1,11 @@
-location,treated_among_hypertensive_mean,treated_among_hypertensive_sd,control_among_treated_mean,control_among_treated_sd
-Italy,0.615,0.0375,0.285,0.0325
-China,0.407,0.0407,0.153,0.0153
-Mexico,0.597,0.1335,0.374,0.0374
-Russian Federation,0.499,0.0499,0.166,0.0166
-South Korea,0.611,0.0611,0.693,0.0693
+location,measure,mean,sd
+Italy,treated_among_hypertensive,0.615,0.0375
+China,treated_among_hypertensive,0.407,0.0407
+Mexico,treated_among_hypertensive,0.597,0.1335
+Russian Federation,treated_among_hypertensive,0.499,0.0499
+South Korea,treated_among_hypertensive,0.611,0.0611
+Italy,controlled_among_treated,0.285,0.0325
+China,controlled_among_treated,0.153,0.0153
+Mexico,controlled_among_treated,0.374,0.0374
+Russian Federation,controlled_among_treated,0.166,0.0166
+South Korea,controlled_among_treated,0.693,0.0693
