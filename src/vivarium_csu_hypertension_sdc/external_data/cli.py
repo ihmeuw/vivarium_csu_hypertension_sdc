@@ -13,7 +13,9 @@ def pcalculate_proportion_hypertensive(location):
     """Calculate 1000 draws of the proportion of the population that has a SBP
     above the hypertensive threshold (SBP of 140) in parallel and aggregate
     to a single hdf file saved in the central vivarium artifact store as
-    ``proportion_hypertensive/location.hdf``
+    ``proportion_hypertensive/location.hdf``. This should be run once for each
+    location to generate the data that the artifact builder will look for.
+
     LOCATION should be specified as all lower-case, with underscores replacing
     spaces (i.e., the same way the model artifacts are named),
     e.g., russian_federation
