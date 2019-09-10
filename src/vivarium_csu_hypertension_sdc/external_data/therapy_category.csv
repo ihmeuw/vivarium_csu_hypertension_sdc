@@ -1,0 +1,16 @@
+location,therapy_category,mean,sd
+China,mono,0.68,0.15
+China,dual,0.28,0.15
+China,3+,0.03,0.15
+Italy,mono,0.65,0.15
+Italy,dual,0.24,0.15
+Italy,3+,0.12,0.15
+Mexico,mono,0.72,0.15
+Mexico,dual,0.23,0.15
+Mexico,3+,0.05,0.15
+Russian Federation,mono,0.25,0.15
+Russian Federation,dual,0.58,0.15
+Russian Federation,3+,0.17,0.15
+South Korea,mono,0.40,0.15
+South Korea,dual,0.42,0.15
+South Korea,3+,0.18,0.15
