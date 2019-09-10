@@ -1,6 +1,8 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
 from gbd_mapping import risk_factors
 from vivarium import Artifact
@@ -28,6 +30,7 @@ def build_treatment_artifact(path, location):
     artifact = create_new_artifact(path, location)
 
     write_proportion_hypertensive(artifact, location)
+    write_hypertension_medication_data(artifact, location)
 
 
 def write_demographic_data(artifact, location):
@@ -239,3 +242,77 @@ def write_proportion_hypertensive(artifact, location):
     data = pd.read_hdf(HYPERTENSION_DATA_FOLDER / f'{location}.hdf', HYPERTENSION_HDF_KEY)
     key = f'risk_factor.high_systolic_blood_pressure.{HYPERTENSION_HDF_KEY}'
     write(artifact, key, data)
+
+
+def write_hypertension_medication_data(artifact, location):
+    external_data_specification = {
+        'adherence': {
+            'seed_columns': ['location', 'age_group_start', 'age_group_end', 'pill_category'],
+            'distribution': 'beta',
+        },
+        'medication_probabilities': {
+            'seed_columns': ['location', 'pill_category',  'thiazide_type_diuretics', 'beta_blockers',
+                             'ace_inhibitors', 'angiotensin_ii_blockers', 'calcium_channel_blockers'],
+            'distribution': 'beta',
+        },
+        'therapy_category': {
+            'seed_columns': ['location', 'therapy_category'],
+            'distribution': 'beta',  # TODO: verify that these are indeed beta distributions
+        },
+        'treatment_coverage': {
+            'seed_columns': ['location', 'measure'],
+            'distribution': 'beta',
+        },
+        'drug_efficacy': {
+            'seed_columns': ['location', 'drug'], # don't include dosage so all dosages of same drug will use same seeds
+            'distribution': 'normal',
+        },
+    }
+
+    for k, spec in external_data_specification:
+        data = load_external_data(k)
+        data = generate_draws(data, spec['seed_columns'], spec['distribution'])
+
+        if 'location' in data:
+            if set(data.location) == {'Global'}:
+                # do this post draw generation so all locations use the same draws if data is global
+                data.location = location
+            data = data.loc[data.location == location]
+
+        key = f'health_technology.hypertension_medication.{k}'
+        write(artifact, key, data)
+
+
+def generate_draws(data, seed_columns, distribution_type):
+    draws = []
+    for row in data.iterrows():
+        np.random.seed('_'.join(row[1][seed_columns]))
+        d = np.random.random(1000)
+        if distribution_type == 'normal':
+            dist = norm(loc=row[1]['mean'], scale=row[1]['sd'])
+        else:  # beta
+            from risk_distributions.risk_distributions import Beta
+            dist = Beta(mean=row[1]['mean'], sd=row[1]['sd'])
+
+        draws.append(dist.ppf(d))
+
+    return pd.concat(data + draws, axis=1)
+
+
+def load_external_data(file_key):
+    from vivarium_csu_hypertension_sdc import external_data
+    data_dir = Path(external_data.__file__).parent
+
+    data = pd.read_csv(data_dir / f'{file_key}.csv')
+
+    # strip all string columns to prevent pesky leading/trailing spaces that may have crept in
+    df_obj = data.select_dtypes(['object'])
+    data[df_obj.columns] = df_obj.apply(lambda x: x.str.strip())
+
+    if 'uncertainty_level' in data:  # convert upper/lower bounds to sd
+        ci_width_map = {99: 2.58, 95: 1.96, 90: 1.65, 68: 1}
+        ci_widths = data.uncertainty_level.map(lambda l: ci_width_map.get(l, 0) * 2)
+        data['sd'] = (data.upper_bound - data.lower_bound) / ci_widths
+        data = data.drop(columns=['uncertainty_level', 'upper_bound', 'lower_bound'])
+
+    return data
