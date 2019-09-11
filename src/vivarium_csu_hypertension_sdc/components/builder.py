@@ -8,6 +8,7 @@ from scipy.stats import norm
 from gbd_mapping import risk_factors
 from vivarium import Artifact
 from vivarium.framework.artifact import get_location_term
+from vivarium.framework.artifact.hdf import EntityKey
 from vivarium_gbd_access import gbd
 from vivarium_inputs.data_artifact.loaders import loader
 from vivarium_inputs.data_artifact.utilities import split_interval
@@ -29,6 +30,9 @@ def build_artifact(path, location):
 
 def build_treatment_artifact(path, location):
     artifact = create_new_artifact(path, location)
+
+    # FIXME: merge this with the above build_artifact and remove the duplicated write_demographic_data
+    write_demographic_data(artifact, location)
 
     write_proportion_hypertensive(artifact, location)
     write_hypertension_medication_data(artifact, location)
@@ -202,7 +206,7 @@ def write(artifact, key, data):
 
 
 def get_load(location):
-    return lambda key: loader(key, location, set())
+    return lambda key: loader(EntityKey(key), location, set())
 
 
 def load_prev_dw(sequela, location):
