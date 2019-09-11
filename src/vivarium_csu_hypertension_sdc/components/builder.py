@@ -252,7 +252,7 @@ def write_hypertension_medication_data(artifact, location):
             'distribution': 'beta',
         },
         'medication_probabilities': {
-            'seed_columns': ['location', 'pill_category',  'thiazide_type_diuretics', 'beta_blockers',
+            'seed_columns': ['location', 'measure',  'thiazide_type_diuretics', 'beta_blockers',
                              'ace_inhibitors', 'angiotensin_ii_blockers', 'calcium_channel_blockers'],
             'distribution': 'beta',
         },
