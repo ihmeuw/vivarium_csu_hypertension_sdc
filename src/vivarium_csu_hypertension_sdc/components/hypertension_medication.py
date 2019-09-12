@@ -43,7 +43,10 @@ class BaselineCoverage:
                                                  #requires_values=['high_systolic_blood_pressure.exposure'],
                                                  #requires_streams=['initial_treatment'])
 
-        self.pdc = builder.value.register_value_producer('hypertension_meds.pdc', self.get_pdc)
+        self.pdc = builder.value.register_value_producer('hypertension_meds.pdc', self.get_pdc,)
+                                                         #requires_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS
+                                                                           + adherence_columns),
+                                                         #requires_values=[])
         builder.value.register_value_modifier('hypertension_meds.effect_size', self.modify_meds_effect_with_pdc)
 
     def on_initialize_simulants(self, pop_data):
@@ -136,9 +139,10 @@ class TreatmentEffect:
                              for m in self.drugs}
 
         self.treatment_effect = builder.value.register_value_producer('hypertension_meds.effect_size',
-                                                                      self.get_treatment_effect)
+                                                                      self.get_treatment_effect, ) #requires_columns=[DOSAGE_COLUMNS])
 
-        builder.value.register_value_modifier('high_systolic_blood_pressure.exposure', self.treat_sbp)
+        builder.value.register_value_modifier('high_systolic_blood_pressure.exposure', self.treat_sbp, )
+                                              #requires_columns=[self.shift_column], requires_values=['hypertension_meds.effect_size'])
 
     def on_initialize_simulants(self, pop_data):
         self.drug_efficacy = self.drug_efficacy.append(self.determine_drug_efficacy(pop_data.index))
