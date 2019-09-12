@@ -43,8 +43,8 @@ class BaselineCoverage:
                                                  #requires_values=['high_systolic_blood_pressure.exposure'],
                                                  #requires_streams=['initial_treatment'])
 
-        self.pdc = builder.value.register_value_producer('hypertension_meds.pdc', self.get_adherence)
-        builder.value.register_value_modifier('hypertension_meds.effect_size', self.modify_meds_effect)
+        self.pdc = builder.value.register_value_producer('hypertension_meds.pdc', self.get_pdc)
+        builder.value.register_value_modifier('hypertension_meds.effect_size', self.modify_meds_effect_with_pdc)
 
     def on_initialize_simulants(self, pop_data):
         medications = pd.DataFrame(0, columns=DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS, index=pop_data.index)
@@ -88,7 +88,7 @@ class BaselineCoverage:
                                                   additional_key='treatment_category')
         return category_choices
 
-    def get_adherence(self, index):
+    def get_pdc(self, index):
         pop = self.population_view.get(index)
 
         thresholds = {k: v(index) for k, v in self.adherent_thresholds.items()}
@@ -105,7 +105,7 @@ class BaselineCoverage:
 
         return pdc
 
-    def modify_meds_effect(self, index, effect_size):
+    def modify_meds_effect_with_pdc(self, index, effect_size):
         return effect_size * self.pdc(index)
 
 
