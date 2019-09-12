@@ -1,7 +1,7 @@
-location,age_start,age_end,pill_category,mean,sd,individual_sd
-Global,0,45,multiple,0.5,0.174441327,0.174441327
-Global,45,60,multiple,0.69,0.174441327,0.174441327
-Global,60,125,multiple,0.88,0.174441327,0.174441327
-Global,0,45,single,0.629,0.2005761116,0.2005761116
-Global,45,60,single,0.77,0.2005761116,0.2005761116
-Global,60,125,single,0.911,0.2005761116,0.2005761116
+location,age_start,age_end,pill_category,mean,sd
+Global,0,45,multiple,0.5,0.174441327
+Global,45,60,multiple,0.69,0.174441327
+Global,60,125,multiple,0.88,0.174441327
+Global,0,45,single,0.629,0.2005761116
+Global,45,60,single,0.77,0.2005761116
+Global,60,125,single,0.911,0.2005761116
