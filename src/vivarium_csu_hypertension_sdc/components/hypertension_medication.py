@@ -5,7 +5,7 @@ import pandas as pd
 
 from vivarium_csu_hypertension_sdc.components import utilities, data_transformations
 from vivarium_csu_hypertension_sdc.components.globals import (HYPERTENSION_DRUGS, HYPERTENSIVE_CONTROLLED_THRESHOLD,
-                                                              SINGLE_PILL_COLUMNS, DOSAGE_COLUMNS)
+                                                              SINGLE_PILL_COLUMNS, DOSAGE_COLUMNS, ADHERENT_THRESHOLD)
 
 
 class BaselineCoverage:
@@ -20,6 +20,7 @@ class BaselineCoverage:
         self.therapy_categories = (builder.data.load('health_technology.hypertension_medication.therapy_category')
                                    .set_index('therapy_category').value)
         self.med_probabilities = builder.data.load('health_technology.hypertension_medication.medication_probabilities')
+        self.adherent_thresholds = data_transformations.load_adherent_thresholds(builder)
 
         self.proportion_above_hypertensive_threshold = builder.lookup.build_table(
             builder.data.load('risk_factor.high_systolic_blood_pressure.proportion_above_hypertensive_threshold'))
@@ -31,10 +32,13 @@ class BaselineCoverage:
 
         self.population_view = builder.population.get_view(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS)
         builder.population.initializes_simulants(self.on_initialize_simulants,
-                                                 creates_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS),
+                                                 creates_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS)
+                                                                 + ['adherent_propensity', 'pdc_propensity'],
                                                  requires_columns=[],)
                                                  #requires_values=['high_systolic_blood_pressure.exposure'],
                                                  #requires_streams=['initial_treatment'])
+
+        builder.value.register_value_producer('hypertension_meds.pdc', self.get_adherence)
 
     def on_initialize_simulants(self, pop_data):
         medications = pd.DataFrame(0, columns=DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS, index=pop_data.index)
@@ -54,6 +58,9 @@ class BaselineCoverage:
         drugs.loc[:, HYPERTENSION_DRUGS] = utilities.get_initial_dosages(drugs, self.randomness)
 
         medications.loc[initially_treated.index] = drugs.rename(columns={d: f'{d}_dosage' for d in HYPERTENSION_DRUGS})
+
+        medications['adherent_propensity'] = self.randomness.get_draw(pop_data.index, 'adherent_propensity')
+        medications['pdc_propensity'] = self.randomness.get_draw(pop_data.index, 'pdc_propensity')
 
         self.population_view.update(medications)
 
@@ -75,6 +82,24 @@ class BaselineCoverage:
         category_choices = self.randomness.choice(index, choices=cat_names, p=cat_probabilities,
                                                   additional_key='treatment_category')
         return category_choices
+
+    def get_adherence(self, index):
+        pop = self.population_view.get(index)
+        #propensities = self.population_view.subview(['adherent_propensity', 'pdc_propensity']).get(index)
+
+        thresholds = {k: v(index) for k, v in self.adherent_thresholds.items()}
+
+        pill_cats = (utilities.get_num_pills(pop.loc[:, DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS])
+                     .apply(lambda n: 'multiple' if n > 1 else 'single'))
+
+        adherence = pd.Series(0, index=index)
+
+        for cat, threshold in thresholds.items():
+            pop_in_cat = pop.loc[pill_cats == 'multiple']
+            adherent = pop_in_cat.adherent_propensity >= threshold['value']
+
+            #pdc
+
 
 
 class TreatmentEffect:
