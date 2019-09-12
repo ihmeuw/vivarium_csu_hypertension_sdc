@@ -1,2 +1,2 @@
 from .hypertension_medication import BaselineCoverage
-from .testing import DummyRisk
+from .testing import DummyContinuousRisk

@@ -8,7 +8,7 @@ components:
         #    - MortalityObserver()
 
     vivarium_csu_hypertension_sdc.components:
-        - DummyRisk('risk_factor.high_systolic_blood_pressure', '120', '150')
+        - DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '120', '150')
         - BaselineCoverage()
 
 configuration:

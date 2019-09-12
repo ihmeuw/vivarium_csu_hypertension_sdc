@@ -4,7 +4,7 @@ import pandas as pd
 from vivarium_public_health.utilities import EntityString
 
 
-class DummyRisk:
+class DummyContinuousRisk:
     def __init__(self, risk, low, high):
         self.risk = EntityString(risk)
         self.low = int(low)
