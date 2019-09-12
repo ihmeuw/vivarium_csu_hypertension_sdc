@@ -42,7 +42,8 @@ def probability_treatment_category_given_sbp_level(sbp_level: str, proportion_hi
 
 
 def get_single_pill_combinations(med_probabilities: pd.DataFrame, num_drugs_in_profile: int) -> pd.DataFrame:
-    """Profiles consisting of num_drugs_in_profile drugs, all packaged into 1 pill."""
+    """Profiles consisting of num_drugs_in_profile drugs, all packaged into
+    1 pill."""
     drug_combinations = med_probabilities.loc[(med_probabilities.measure == 'single_pill_combination_probability') &
                                               (med_probabilities[HYPERTENSION_DRUGS].sum(axis=1) == num_drugs_in_profile)]
     drug_combinations = pd.concat(
@@ -58,7 +59,8 @@ def get_single_pill_combinations(med_probabilities: pd.DataFrame, num_drugs_in_p
 
 
 def get_individual_pill_combinations(med_probabilities: pd.DataFrame, num_drugs_in_profile: int) -> pd.DataFrame:
-    """Profiles consisting of num_drugs_in_profile pills."""
+    """Profiles consisting of num_drugs_in_profile pills, each pill containing
+    one drug."""
     drug_combinations = pd.DataFrame(columns=HYPERTENSION_DRUGS + [f'{d}_in_single_pill' for d in HYPERTENSION_DRUGS])
     individual_drug_probs = med_probabilities.loc[med_probabilities.measure == 'individual_drug_probability']
 
