@@ -5,9 +5,8 @@ import pandas as pd
 
 from vivarium.framework.randomness import RandomnessStream
 from vivarium_csu_hypertension_sdc.components.globals import (HYPERTENSION_DRUGS, HYPERTENSION_DOSAGES,
-                                                              ILLEGAL_DRUG_COMBINATION, DOSAGE_COLUMNS)
-
-SINGLE_PILL_COLUMNS = [f'{d}_in_single_pill' for d in HYPERTENSION_DRUGS]
+                                                              ILLEGAL_DRUG_COMBINATION, DOSAGE_COLUMNS,
+                                                              SINGLE_PILL_COLUMNS)
 
 
 def probability_treatment_category_given_sbp_level(sbp_level: str, proportion_high_sbp: pd.DataFrame,
