@@ -36,6 +36,7 @@ def build_treatment_artifact(path, location):
 
     write_proportion_hypertensive(artifact, location)
     write_hypertension_medication_data(artifact, location)
+    write_utilization_rate(artifact, location)
 
 
 def write_demographic_data(artifact, location):
@@ -349,3 +350,10 @@ def str_to_seed(s):
     hash_digest = hashlib.sha256(s.encode()).digest()
     seed = int.from_bytes(hash_digest, 'big') % (2**32 - 1)
     return seed
+
+
+def write_utilization_rate(artifact, location):
+    load = get_load(location)
+    key = 'healthcare_entity.outpatient_visits.utilization_rate'
+    data = load(key)
+    write(artifact, key, data)
