@@ -9,7 +9,6 @@ components:
 
     vivarium_csu_hypertension_sdc.components:
         - DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '120', '150')
-        - DummyAdherence("0.5")
         - BaselineCoverage()
         - TreatmentEffect()
 
