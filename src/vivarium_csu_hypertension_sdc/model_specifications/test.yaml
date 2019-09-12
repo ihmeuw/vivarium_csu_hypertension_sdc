@@ -2,12 +2,13 @@ components:
     vivarium_public_health:
         population:
             - BasePopulation()
-            - Mortality()
-        metrics:
-            - DisabilityObserver()
-            - MortalityObserver()
+            #- Mortality()
+        #metrics:
+        #    - DisabilityObserver()
+        #    - MortalityObserver()
 
     vivarium_csu_hypertension_sdc.components:
+        - DummyRisk('risk_factor.high_systolic_blood_pressure', '120', '150')
         - BaselineCoverage()
 
 configuration:
@@ -33,7 +34,7 @@ configuration:
             day: 2
         step_size: 1 # Days
     population:
-        population_size: 100
+        population_size: 10_000
         age_start: 30
         age_end: 125
 
