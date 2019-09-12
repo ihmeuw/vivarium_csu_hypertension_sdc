@@ -3,11 +3,12 @@ from pathlib import Path
 import hashlib
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
+from scipy.stats import norm, beta
 
 from gbd_mapping import risk_factors
 from vivarium import Artifact
 from vivarium.framework.artifact import get_location_term
+from vivarium.framework.artifact.hdf import EntityKey
 from vivarium_gbd_access import gbd
 from vivarium_inputs.data_artifact.loaders import loader
 from vivarium_inputs.data_artifact.utilities import split_interval
@@ -29,6 +30,9 @@ def build_artifact(path, location):
 
 def build_treatment_artifact(path, location):
     artifact = create_new_artifact(path, location)
+
+    # FIXME: merge this with the above build_artifact and remove the duplicated write_demographic_data
+    write_demographic_data(artifact, location)
 
     write_proportion_hypertensive(artifact, location)
     write_hypertension_medication_data(artifact, location)
@@ -202,7 +206,7 @@ def write(artifact, key, data):
 
 
 def get_load(location):
-    return lambda key: loader(key, location, set())
+    return lambda key: loader(EntityKey(key), location, set())
 
 
 def load_prev_dw(sequela, location):
@@ -252,7 +256,7 @@ def write_hypertension_medication_data(artifact, location):
             'distribution': 'beta',
         },
         'medication_probabilities': {
-            'seed_columns': ['location', 'pill_category',  'thiazide_type_diuretics', 'beta_blockers',
+            'seed_columns': ['location', 'measure',  'thiazide_type_diuretics', 'beta_blockers',
                              'ace_inhibitors', 'angiotensin_ii_blockers', 'calcium_channel_blockers'],
             'distribution': 'beta',
         },
@@ -297,17 +301,21 @@ def generate_draws(data, seed_columns, distribution_type):
 
     if distribution_type is not None:
         for row in data.iterrows():
-            seed = str_to_seed('_'.join([str(s) for s in row[1][seed_columns]]))
-            np.random.seed(seed)
-            d = np.random.random(1000)
-            if distribution_type == 'normal':
-                dist = norm(loc=row[1]['mean'], scale=row[1]['sd'])
-            else:  # beta
-                from risk_distributions.risk_distributions import Beta
-                dist = Beta(mean=row[1]['mean'], sd=row[1]['sd'])
+            if row[1]['sd'] != 0:
+                seed = str_to_seed('_'.join([str(s) for s in row[1][seed_columns]]))
+                np.random.seed(seed)
+                d = np.random.random(1000)
+                if distribution_type == 'normal':
+                    dist = norm(loc=row[1]['mean'], scale=row[1]['sd'])
+                else:  # beta
+                    from risk_distributions.risk_distributions import Beta
+                    params = Beta._get_parameters(mean=pd.Series(row[1]['mean']), sd=pd.Series(row[1]['sd']),
+                                                  x_min=pd.Series(0), x_max=pd.Series(1))
+                    dist = beta(**params)
 
-            data.loc[row[0], globals.DRAW_COLUMNS] = dist.ppf(d)
+                data.loc[row[0], globals.DRAW_COLUMNS] = dist.ppf(d)
 
+    assert np.all(~data.isna()), "Something's wrong: NaNs were generated for draws. "
     return data.drop(columns=['mean', 'sd'])
 
 
