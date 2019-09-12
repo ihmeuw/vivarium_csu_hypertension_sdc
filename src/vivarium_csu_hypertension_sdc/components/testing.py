@@ -19,3 +19,16 @@ class DummyContinuousRisk:
                                               source=lambda index: pd.Series(np.random.randint(self.low, self.high,
                                                                                                size=len(index)),
                                                                              index=index))
+
+
+class DummyAdherence:
+    def __init__(self, adherence_value):
+        self.adherence = float(adherence_value)
+
+    @property
+    def name(self):
+        return f'dummy_adherence({self.adherence})'
+
+    def setup(self, builder):
+        builder.value.register_value_producer('hypertension_meds.adherence',
+                                              source=lambda index: pd.Series(self.adherence, index=index))

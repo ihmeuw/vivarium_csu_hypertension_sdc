@@ -1,2 +1,2 @@
-from .hypertension_medication import BaselineCoverage
-from .testing import DummyContinuousRisk
+from .hypertension_medication import BaselineCoverage, TreatmentEffect
+from .testing import DummyContinuousRisk, DummyAdherence

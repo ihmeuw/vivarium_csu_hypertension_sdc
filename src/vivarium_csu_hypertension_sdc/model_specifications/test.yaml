@@ -9,13 +9,15 @@ components:
 
     vivarium_csu_hypertension_sdc.components:
         - DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '120', '150')
+        - DummyAdherence("0.5")
         - BaselineCoverage()
+        - TreatmentEffect()
 
 configuration:
     input_data:
         location: China
         input_draw_number: 0
-        artifact_path: /share/costeffectiveness/artifacts/vivarium_csu_hypertension_sdc/china.hdf
+        artifact_path: /home/kate/vivarium_artifacts/vivarium_csu_hypertension_sdc/china.hdf #/share/costeffectiveness/artifacts/vivarium_csu_hypertension_sdc/china.hdf
     interpolation:
         order: 0
         extrapolate: False

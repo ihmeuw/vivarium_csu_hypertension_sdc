@@ -1,15 +1,14 @@
+from scipy import stats
+
 import numpy as np
 import pandas as pd
 
-from vivarium_csu_hypertension_sdc.components import utilities
-from vivarium_csu_hypertension_sdc.components.globals import (HYPERTENSION_DRUGS, HYPERTENSIVE_CONTROLLED_THRESHOLD)
+from vivarium_csu_hypertension_sdc.components import utilities, data_transformations
+from vivarium_csu_hypertension_sdc.components.globals import (HYPERTENSION_DRUGS, HYPERTENSIVE_CONTROLLED_THRESHOLD,
+                                                              SINGLE_PILL_COLUMNS, DOSAGE_COLUMNS)
 
 
 class BaselineCoverage:
-
-    def __init__(self):
-        self._dosage_columns = [f'{d}_dosage' for d in HYPERTENSION_DRUGS]
-        self._single_pill_columns = [f'{d}_in_single_pill' for d in HYPERTENSION_DRUGS]
 
     @property
     def name(self):
@@ -30,14 +29,14 @@ class BaselineCoverage:
 
         self.randomness = builder.randomness.get_stream('initial_treatment')
 
-        self.population_view = builder.population.get_view(self._dosage_columns + self._single_pill_columns)
+        self.population_view = builder.population.get_view(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS)
         builder.population.initializes_simulants(self.on_initialize_simulants,
-                                                 creates_columns=(self._dosage_columns + self._single_pill_columns),
+                                                 creates_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS),
                                                  requires_columns=[],)
                                                  #requires_values=['high_systolic_blood_pressure.exposure'])
 
     def on_initialize_simulants(self, pop_data):
-        medications = pd.DataFrame(0, columns=self._dosage_columns + self._single_pill_columns, index=pop_data.index)
+        medications = pd.DataFrame(0, columns=DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS, index=pop_data.index)
 
         initial_tx_cats = self.get_initial_treatment_category(pop_data.index)
 
@@ -45,7 +44,7 @@ class BaselineCoverage:
         cat_groups = initially_treated.groupby(initially_treated).apply(lambda g: g.index)
 
         # choose drug/pill combination first
-        drugs = pd.DataFrame(columns=HYPERTENSION_DRUGS + self._single_pill_columns, index=initially_treated.index)
+        drugs = pd.DataFrame(columns=HYPERTENSION_DRUGS + SINGLE_PILL_COLUMNS, index=initially_treated.index)
         for cat, idx in cat_groups.iteritems():
             drugs.loc[idx] = utilities.get_initial_drugs_given_category(self.med_probabilities, cat,
                                                                         idx, self.randomness)
@@ -76,3 +75,80 @@ class BaselineCoverage:
                                                   additional_key='treatment_category')
         return category_choices
 
+
+class TreatmentEffect:
+
+    @property
+    def name(self):
+        return 'hypertension_meds_treatment_effect'
+
+    def setup(self, builder):
+        self.drugs = HYPERTENSION_DRUGS
+        self.efficacy_data = data_transformations.load_efficacy_data(builder).reset_index()
+
+        self.drug_efficacy = pd.Series(index=pd.MultiIndex(levels=[[], [], []],
+                                                                 labels=[[], [], []],
+                                                                 names=['simulant', 'drug', 'dosage']))
+
+        self.shift_column = 'hypertension_meds_baseline_shift'
+
+        self.population_view = builder.population.get_view([self.shift_column] + DOSAGE_COLUMNS)
+        builder.population.initializes_simulants(self.on_initialize_simulants,
+                                                 creates_columns=[self.shift_column],
+                                                 requires_columns=DOSAGE_COLUMNS, )
+                                                 #requires_values=['hypertension_meds.adherence'],
+                                                 #requires_streams=['dose_efficacy'])
+
+        self.adherence = builder.value.get_value('hypertension_meds.adherence')
+        self.randomness = builder.randomness.get_stream('dose_efficacy')
+        self.drug_effects = {m: builder.value.register_value_producer(f'{m}.effect_size', self.get_drug_effect)
+                             for m in self.drugs}
+
+        self.treatment_effect = builder.value.register_value_producer('hypertension_meds.effect_size',
+                                                                      self.get_treatment_effect)
+
+        builder.value.register_value_modifier('high_systolic_blood_pressure.exposure', self.treat_sbp)
+
+    def on_initialize_simulants(self, pop_data):
+        self.drug_efficacy = self.drug_efficacy.append(self.determine_drug_efficacy(pop_data.index))
+        effects = self.get_treatment_effect(pop_data.index)
+        effects.name = self.shift_column
+        self.population_view.update(effects)
+
+    def determine_drug_efficacy(self, index):
+        efficacy = []
+
+        for drug in self.drugs:
+            efficacy_draw = self.randomness.get_draw(index, additional_key=drug)
+            med_efficacy = self.efficacy_data.query('drug == @drug')
+            for dose in med_efficacy.dosage.unique():
+                dose_efficacy_parameters = med_efficacy.loc[med_efficacy.dosage == dose, ['value', 'individual_sd']].values[0]
+                dose_index = pd.MultiIndex.from_product((index, [drug], [dose]),
+                                                        names=('simulant', 'drug', 'dosage'))
+                if dose_efficacy_parameters[1] == 0.0:  # if sd is 0, no need to draw
+                    dose_efficacy = pd.Series(dose_efficacy_parameters[0], index=dose_index)
+                else:
+                    dose_efficacy = pd.Series(stats.norm.ppf(efficacy_draw, loc=dose_efficacy_parameters[0],
+                                                             scale=dose_efficacy_parameters[1]),
+                                              index=dose_index)
+                efficacy.append(dose_efficacy)
+
+        return pd.concat(efficacy)
+
+    def get_drug_effect(self, dosages, drug):
+        lookup_index = pd.MultiIndex.from_arrays((dosages.index.values,
+                                                  np.tile(drug, len(dosages)),
+                                                  dosages.values),
+                                                 names=('simulant', 'drug', 'dosage'))
+
+        efficacy = self.drug_efficacy.loc[lookup_index]
+        efficacy.index = efficacy.index.droplevel(['drug', 'dosage'])
+        return efficacy
+
+    def get_treatment_effect(self, index):
+        prescribed_meds = self.population_view.subview(DOSAGE_COLUMNS).get(index)
+        return sum([self.get_drug_effect(prescribed_meds[f'{d}_dosage'], d) for d in self.drugs]) * self.adherence(index)
+
+    def treat_sbp(self, index, exposure):
+        baseline_shift = self.population_view.subview([self.shift_column]).get(index)[self.shift_column]
+        return exposure + baseline_shift - self.treatment_effect(index)
