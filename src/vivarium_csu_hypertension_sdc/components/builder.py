@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
+from scipy.stats import norm, beta
 
 from gbd_mapping import risk_factors
 from vivarium import Artifact
@@ -301,20 +301,22 @@ def generate_draws(data, seed_columns, distribution_type):
 
     if distribution_type is not None:
         for row in data.iterrows():
-            seed = str_to_seed('_'.join([str(s) for s in row[1][seed_columns]]))
-            np.random.seed(seed)
-            d = np.random.random(1000)
-            if distribution_type == 'normal':
-                dist = norm(loc=row[1]['mean'], scale=row[1]['sd'])
-            else:  # beta
-                from risk_distributions.risk_distributions import Beta
-                dist = Beta(mean=row[1]['mean'], sd=row[1]['sd'])
+            if row[1]['sd'] != 0:
+                seed = str_to_seed('_'.join([str(s) for s in row[1][seed_columns]]))
+                np.random.seed(seed)
+                d = np.random.random(1000)
+                if distribution_type == 'normal':
+                    dist = norm(loc=row[1]['mean'], scale=row[1]['sd'])
+                else:  # beta
+                    from risk_distributions.risk_distributions import Beta
+                    params = Beta._get_parameters(mean=pd.Series(row[1]['mean']), sd=pd.Series(row[1]['sd']),
+                                                  x_min=pd.Series(0), x_max=pd.Series(1))
+                    dist = beta(**params)
 
-            data.loc[row[0], globals.DRAW_COLUMNS] = dist.ppf(d)
+                data.loc[row[0], globals.DRAW_COLUMNS] = dist.ppf(d)
 
-    # FIXME: getting NaNs from Beta dist and not sure if those are an artifact of the way we've implemented risk dists
-    #  and will go away once we switch to scipy version
-    return data.drop(columns=['mean', 'sd']).fillna(0)  # fill NaNs from Beta dist with 0s for now
+    assert np.all(~data.isna()), "Something's wrong: NaNs were generated for draws. "
+    return data.drop(columns=['mean', 'sd'])
 
 
 def load_external_data(file_key, location):

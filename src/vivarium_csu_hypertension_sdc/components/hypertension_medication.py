@@ -34,7 +34,8 @@ class BaselineCoverage:
         builder.population.initializes_simulants(self.on_initialize_simulants,
                                                  creates_columns=(self._dosage_columns + self._single_pill_columns),
                                                  requires_columns=[],)
-                                                 #requires_values=['high_systolic_blood_pressure.exposure'])
+                                                 #requires_values=['high_systolic_blood_pressure.exposure'],
+                                                 #requires_streams=['initial_treatment'])
 
     def on_initialize_simulants(self, pop_data):
         medications = pd.DataFrame(0, columns=self._dosage_columns + self._single_pill_columns, index=pop_data.index)
