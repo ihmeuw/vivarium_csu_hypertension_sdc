@@ -95,8 +95,7 @@ class TreatmentEffect:
         self.population_view = builder.population.get_view([self.shift_column] + DOSAGE_COLUMNS)
         builder.population.initializes_simulants(self.on_initialize_simulants,
                                                  creates_columns=[self.shift_column],
-                                                 requires_columns=DOSAGE_COLUMNS, )
-                                                 #requires_values=['hypertension_meds.adherence'],
+                                                 requires_columns=DOSAGE_COLUMNS, ),
                                                  #requires_streams=['dose_efficacy'])
 
         self.adherence = builder.value.get_value('hypertension_meds.adherence')
@@ -111,7 +110,7 @@ class TreatmentEffect:
 
     def on_initialize_simulants(self, pop_data):
         self.drug_efficacy = self.drug_efficacy.append(self.determine_drug_efficacy(pop_data.index))
-        effects = self.get_treatment_effect(pop_data.index)
+        effects = self.treatment_effect(pop_data.index)
         effects.name = self.shift_column
         self.population_view.update(effects)
 
@@ -147,7 +146,7 @@ class TreatmentEffect:
 
     def get_treatment_effect(self, index):
         prescribed_meds = self.population_view.subview(DOSAGE_COLUMNS).get(index)
-        return sum([self.get_drug_effect(prescribed_meds[f'{d}_dosage'], d) for d in self.drugs]) * self.adherence(index)
+        return sum([self.get_drug_effect(prescribed_meds[f'{d}_dosage'], d) for d in self.drugs])
 
     def treat_sbp(self, index, exposure):
         baseline_shift = self.population_view.subview([self.shift_column]).get(index)[self.shift_column]
