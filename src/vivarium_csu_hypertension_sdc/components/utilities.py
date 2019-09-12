@@ -7,6 +7,8 @@ from vivarium.framework.randomness import RandomnessStream
 from vivarium_csu_hypertension_sdc.components.globals import (HYPERTENSION_DRUGS, HYPERTENSION_DOSAGES,
                                                               ILLEGAL_DRUG_COMBINATION)
 
+SINGLE_PILL_COLUMNS = [f'{d}_in_single_pill' for d in HYPERTENSION_DRUGS]
+
 
 def probability_treatment_category_given_sbp_level(sbp_level: str, proportion_high_sbp: pd.DataFrame,
                                                    coverage: pd.Series, categories: pd.Series) -> (pd.Series, list):
@@ -39,30 +41,12 @@ def probability_treatment_category_given_sbp_level(sbp_level: str, proportion_hi
     return prob_categories, category_names
 
 
-def get_mono_dosages(mono_index: pd.Index, med_probabilities: pd.DataFrame,
-                     randomness: RandomnessStream) -> pd.DataFrame:
-    mono_options = med_probabilities.loc[med_probabilities.measure == 'individual_drug_probability']
-    # normalize probabilities to sum to 1
-    mono_options['value'] /= mono_options['value'].sum()
-    assert len(mono_options) == len(HYPERTENSION_DRUGS), "Medication probabilities don't line up with set of drugs."
-
-    drug_choices = randomness.choice(mono_index, choices=mono_options.index, p=mono_options.value,
-                                     additional_key='drug_choice')
-    chosen_drugs = mono_options.loc[drug_choices, HYPERTENSION_DRUGS].set_index(mono_index)
-
-    dosage_choices = randomness.choice(mono_index, choices=HYPERTENSION_DOSAGES,
-                                       additional_key='dosage_choice')
-
-    choices = chosen_drugs.multiply(dosage_choices, axis=0)
-    return choices.rename(columns={c: f'{c}_dosage' for c in HYPERTENSION_DRUGS})
-
-
 def get_single_pill_combinations(med_probabilities: pd.DataFrame, num_drugs_in_profile: int) -> pd.DataFrame:
     """Profiles consisting of num_drugs_in_profile drugs, all packaged into 1 pill."""
     drug_combinations = med_probabilities.loc[(med_probabilities.measure == 'single_pill_combination_probability') &
                                               (med_probabilities[HYPERTENSION_DRUGS].sum(axis=1) == num_drugs_in_profile)]
     drug_combinations = pd.concat(
-        [drug_combinations, pd.DataFrame(0, columns=[f'{d}_in_single_pill' for d in HYPERTENSION_DRUGS],
+        [drug_combinations, pd.DataFrame(0, columns=SINGLE_PILL_COLUMNS,
                                          index=drug_combinations.index)], axis=1)
 
     for row in drug_combinations.iterrows():
@@ -92,7 +76,7 @@ def get_single_pill_individual_pill_combinations(med_probabilities: pd.DataFrame
                                                  num_drugs_in_profile: int) -> pd.DataFrame:
     """Profiles consisting of 1 pill with (num_drugs_in_profile - 1) drugs
     packaged into it + 1 additional pill with another drug."""
-    drug_combinations = pd.DataFrame(columns=HYPERTENSION_DRUGS + [f'{d}_in_single_pill' for d in HYPERTENSION_DRUGS])
+    drug_combinations = pd.DataFrame(columns=HYPERTENSION_DRUGS + SINGLE_PILL_COLUMNS)
     individual_drug_probs = med_probabilities.loc[med_probabilities.measure == 'individual_drug_probability']
 
     single_pills_in_combo = med_probabilities.loc[(med_probabilities.measure == 'single_pill_combination_probability') &
@@ -136,11 +120,22 @@ def generate_category_drug_combos(med_probabilities: pd.DataFrame, category: str
     return drug_combinations
 
 
-def get_dosages_for_num_pills(drugs: pd.DataFrame, num_pills: int, randomness: RandomnessStream) -> pd.DataFrame:
-    if num_pills == 1:
-        dosages = randomness.choice(drugs.index, HYPERTENSION_DOSAGES, additional_key='dosage_choice')
-        drugs.loc[HYPERTENSION_DRUGS] *= dosages
-    elif num_pills == 2:
-        dose_combinations = [c for c in combinations(HYPERTENSION_DOSAGES * num_pills, num_pills)]
-        dosages = randomness.choice(drugs.index, dose_combinations, additional_key='dosage_choice')
-        drugs.loc[]
+def get_dosages(drugs: pd.DataFrame, randomness: RandomnessStream) -> pd.DataFrame:
+    # dosage for single pill combination
+    dosages = randomness.choice(drugs.index, HYPERTENSION_DOSAGES, additional_key='single_pill_dosage_choice')
+    dosages = np.outer(dosages.values, np.ones(5))
+
+    in_single_pill_mask = np.logical_and(drugs[HYPERTENSION_DRUGS].values, drugs[SINGLE_PILL_COLUMNS].values)
+    drug_dosages = dosages * drugs[HYPERTENSION_DRUGS].mask(~in_single_pill_mask, 0)
+
+    # dosages for each drug if it were not in a single pill combination
+    dosages = []
+    for d in HYPERTENSION_DRUGS:
+        dosages.append(randomness.choice(drugs.index, HYPERTENSION_DOSAGES, additional_key=f'{d}_dosage_choice'))
+    dosages = pd.concat(dosages, axis=1)
+
+    drug_dosages = drug_dosages.mask(~in_single_pill_mask,
+                                     (dosages.values * drugs[HYPERTENSION_DRUGS].mask(in_single_pill_mask, 0)))
+
+    return drug_dosages
+
