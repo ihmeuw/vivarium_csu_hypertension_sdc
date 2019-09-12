@@ -31,9 +31,9 @@ def probability_treatment_category_given_sbp_level(sbp_level: str, proportion_hi
     category_names = categories.index.to_list() + ['none']
 
     def get_category_probabilities(p_treated):
-        p_profile = p_treated * categories.values
-        p_profile[-1] = 1.0 - np.sum(p_profile)
-        return p_profile
+        p_category = p_treated * categories.values
+        p_category = np.append(p_category, 1.0 - np.sum(p_category))
+        return p_category
 
     prob_categories = prob_treated.apply(get_category_probabilities)
 
