@@ -312,7 +312,9 @@ def generate_draws(data, seed_columns, distribution_type):
 
             data.loc[row[0], globals.DRAW_COLUMNS] = dist.ppf(d)
 
-    return data.drop(columns=['mean', 'sd']).fillna(0)  # fill NaNs from Beta dist with 0s
+    # FIXME: getting NaNs from Beta dist and not sure if those are an artifact of the way we've implemented risk dists
+    #  and will go away once we switch to scipy version
+    return data.drop(columns=['mean', 'sd']).fillna(0)  # fill NaNs from Beta dist with 0s for now
 
 
 def load_external_data(file_key, location):
