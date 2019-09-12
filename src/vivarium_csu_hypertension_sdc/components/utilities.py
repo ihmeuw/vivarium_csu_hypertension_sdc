@@ -39,7 +39,7 @@ def probability_treatment_category_given_sbp_level(sbp_level: str, proportion_hi
     return prob_categories, category_names
 
 
-def get_mono_dosages(mono_index: pd.DataFrame, med_probabilities: pd.DataFrame,
+def get_mono_dosages(mono_index: pd.Index, med_probabilities: pd.DataFrame,
                      randomness: RandomnessStream) -> pd.DataFrame:
     mono_options = med_probabilities.loc[med_probabilities.measure == 'individual_drug_probability']
     # normalize probabilities to sum to 1
@@ -70,30 +70,20 @@ def get_single_pill_combinations(med_probabilities: pd.DataFrame, num_drugs_in_p
         in_pill = [f'{d}_in_single_pill' for d in drugs[drugs > 0].index]
         drug_combinations.loc[row[0], in_pill] = 1
 
-    half_dosage = drug_combinations.copy()
-    half_dosage.loc[:, HYPERTENSION_DRUGS] *= 0.5
-
-    double_dosage = drug_combinations.copy()
-    double_dosage.loc[:, HYPERTENSION_DRUGS] *= 2.0
-
-    drug_combinations = pd.concat([drug_combinations, half_dosage, double_dosage], axis=0).reset_index(drop=True)
-    drug_combinations.loc[:, 'value'] /= 3  # split probabilities between 3 dosage possibilities
     return drug_combinations
 
 
 def get_individual_pill_combinations(med_probabilities: pd.DataFrame, num_drugs_in_profile: int) -> pd.DataFrame:
     """Profiles consisting of num_drugs_in_profile pills."""
-    drug_combinations = pd.DataFrame(columns=HYPERTENSION_DRUGS)
+    drug_combinations = pd.DataFrame(columns=HYPERTENSION_DRUGS + [f'{d}_in_single_pill' for d in HYPERTENSION_DRUGS])
     individual_drug_probs = med_probabilities.loc[med_probabilities.measure == 'individual_drug_probability']
-
-    dose_combinations = [c for c in combinations(HYPERTENSION_DOSAGES * num_drugs_in_profile, num_drugs_in_profile)]
 
     for c in combinations(HYPERTENSION_DRUGS, num_drugs_in_profile):
         if not ILLEGAL_DRUG_COMBINATION.issubset(c):
             total_prob = sum([individual_drug_probs.loc[individual_drug_probs[d] == 1, 'value'].values[0] for d in c])
-            combo_dosages = pd.DataFrame(dose_combinations, columns=[f'{d}_dosage' for d in c])
-            combo_dosages['value'] = total_prob / len(combo_dosages)
-            drug_combinations = drug_combinations.append(combo_dosages)
+            combo_drugs = {d: 1 for d in c}
+            combo_drugs['value'] = total_prob
+            drug_combinations = drug_combinations.append(combo_drugs, ignore_index=True)
 
     return drug_combinations
 
@@ -110,7 +100,6 @@ def get_single_pill_individual_pill_combinations(med_probabilities: pd.DataFrame
                                                       axis=1)) > 0)]
 
     # assuming we only ever have 1 single pill + 1 other drug in a combo
-    dose_combinations = [[c[0]] + list(c) for c in combinations(HYPERTENSION_DOSAGES * 2, 2)]  # dosage (x, x, y)
 
     for row in single_pills_in_combo.iterrows():
         drugs = row[1][HYPERTENSION_DRUGS]
@@ -121,12 +110,14 @@ def get_single_pill_individual_pill_combinations(med_probabilities: pd.DataFrame
             if not ILLEGAL_DRUG_COMBINATION.issubset(combo):
                 total_prob = row[1]['value'] * \
                              individual_drug_probs.loc[individual_drug_probs[drug] == 1, 'value'].values[0]
-                combo_dosages = pd.DataFrame(dose_combinations, columns=[f'{d}_dosage' for d in combo])
-                combo_dosages['value'] = total_prob / len(combo_dosages)
-                drug_combinations = drug_combinations.append(combo_dosages)
+                combo_drugs = {d: 1 for d in combo}
+                combo_drugs['value'] = total_prob
+                drug_combinations = drug_combinations.append(combo_drugs, ignore_index=True)
+
+    return drug_combinations
 
 
-def generate_category_treatment_profiles(med_probabilities: pd.DataFrame, category: str):
+def generate_category_drug_combos(med_probabilities: pd.DataFrame, category: str) -> pd.DataFrame:
     category_num_drugs = {'mono': 1, 'dual': 2, '3+': 3}
     num_drugs_in_profile = category_num_drugs[category]
 
@@ -142,4 +133,14 @@ def generate_category_treatment_profiles(med_probabilities: pd.DataFrame, catego
     # normalize probabilities so they sum to 1
     drug_combinations['value'] /= drug_combinations['value'].sum()
 
-    return drug_combinations.rename(columns={d: f'{d}_dosage' for d in HYPERTENSION_DRUGS})
+    return drug_combinations
+
+
+def get_dosages_for_num_pills(drugs: pd.DataFrame, num_pills: int, randomness: RandomnessStream) -> pd.DataFrame:
+    if num_pills == 1:
+        dosages = randomness.choice(drugs.index, HYPERTENSION_DOSAGES, additional_key='dosage_choice')
+        drugs.loc[HYPERTENSION_DRUGS] *= dosages
+    elif num_pills == 2:
+        dose_combinations = [c for c in combinations(HYPERTENSION_DOSAGES * num_pills, num_pills)]
+        dosages = randomness.choice(drugs.index, dose_combinations, additional_key='dosage_choice')
+        drugs.loc[]
