@@ -5,10 +5,14 @@ import pandas as pd
 
 from vivarium_csu_hypertension_sdc.components import utilities, data_transformations
 from vivarium_csu_hypertension_sdc.components.globals import (HYPERTENSION_DRUGS, HYPERTENSIVE_CONTROLLED_THRESHOLD,
-                                                              SINGLE_PILL_COLUMNS, DOSAGE_COLUMNS)
+                                                              SINGLE_PILL_COLUMNS, DOSAGE_COLUMNS, MIN_PDC_FOR_ADHERENT)
 
 
 class BaselineCoverage:
+
+    def __init__(self):
+        self.pdc_dist_for_adherent = stats.uniform(loc=MIN_PDC_FOR_ADHERENT, scale=(1 - MIN_PDC_FOR_ADHERENT))
+        self.pdc_dist_for_non_adherent = stats.uniform(loc=0, scale=MIN_PDC_FOR_ADHERENT)
 
     @property
     def name(self):
@@ -20,6 +24,7 @@ class BaselineCoverage:
         self.therapy_categories = (builder.data.load('health_technology.hypertension_medication.therapy_category')
                                    .set_index('therapy_category').value)
         self.med_probabilities = builder.data.load('health_technology.hypertension_medication.medication_probabilities')
+        self.adherent_thresholds = data_transformations.load_adherent_thresholds(builder)
 
         self.proportion_above_hypertensive_threshold = builder.lookup.build_table(
             builder.data.load('risk_factor.high_systolic_blood_pressure.proportion_above_hypertensive_threshold'))
@@ -29,12 +34,20 @@ class BaselineCoverage:
 
         self.randomness = builder.randomness.get_stream('initial_treatment')
 
-        self.population_view = builder.population.get_view(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS)
+        adherence_columns = ['adherent_propensity', 'pdc_propensity']
+        self.population_view = builder.population.get_view(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS + adherence_columns)
         builder.population.initializes_simulants(self.on_initialize_simulants,
-                                                 creates_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS),
+                                                 creates_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS
+                                                                  + adherence_columns),
                                                  requires_columns=[],)
                                                  #requires_values=['high_systolic_blood_pressure.exposure'],
                                                  #requires_streams=['initial_treatment'])
+
+        self.pdc = builder.value.register_value_producer('hypertension_meds.pdc', self.get_pdc,)
+                                                         #requires_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS
+                                                                           + adherence_columns),
+                                                         #requires_values=[])
+        builder.value.register_value_modifier('hypertension_meds.effect_size', self.modify_meds_effect_with_pdc)
 
     def on_initialize_simulants(self, pop_data):
         medications = pd.DataFrame(0, columns=DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS, index=pop_data.index)
@@ -49,11 +62,13 @@ class BaselineCoverage:
         for cat, idx in cat_groups.iteritems():
             drugs.loc[idx] = utilities.get_initial_drugs_given_category(self.med_probabilities, cat,
                                                                         idx, self.randomness)
-
         # then select dosages
         drugs.loc[:, HYPERTENSION_DRUGS] = utilities.get_initial_dosages(drugs, self.randomness)
 
         medications.loc[initially_treated.index] = drugs.rename(columns={d: f'{d}_dosage' for d in HYPERTENSION_DRUGS})
+
+        medications['adherent_propensity'] = self.randomness.get_draw(pop_data.index, 'adherent_propensity')
+        medications['pdc_propensity'] = self.randomness.get_draw(pop_data.index, 'pdc_propensity')
 
         self.population_view.update(medications)
 
@@ -75,6 +90,26 @@ class BaselineCoverage:
         category_choices = self.randomness.choice(index, choices=cat_names, p=cat_probabilities,
                                                   additional_key='treatment_category')
         return category_choices
+
+    def get_pdc(self, index):
+        pop = self.population_view.get(index)
+
+        thresholds = {k: v(index) for k, v in self.adherent_thresholds.items()}
+        pill_cats = (utilities.get_num_pills(pop.loc[:, DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS])
+                     .apply(lambda n: 'multiple' if n > 1 else 'single'))
+
+        pdc = pd.Series(0, index=index)
+
+        for cat, threshold in thresholds.items():
+            pop_in_cat = pop.loc[pill_cats == cat]
+            adherent = pop_in_cat.adherent_propensity >= threshold.loc[pop_in_cat.index, 'value']
+            pdc.loc[pop_in_cat[~adherent].index] = self.pdc_dist_for_non_adherent.ppf(pop_in_cat.loc[~adherent, 'pdc_propensity'])
+            pdc.loc[pop_in_cat[adherent].index] = self.pdc_dist_for_adherent.ppf(pop_in_cat.loc[adherent, 'pdc_propensity'])
+
+        return pdc
+
+    def modify_meds_effect_with_pdc(self, index, effect_size):
+        return effect_size * self.pdc(index)
 
 
 class TreatmentEffect:
@@ -99,15 +134,15 @@ class TreatmentEffect:
                                                  requires_columns=DOSAGE_COLUMNS, ),
                                                  #requires_streams=['dose_efficacy'])
 
-        self.adherence = builder.value.get_value('hypertension_meds.adherence')
         self.randomness = builder.randomness.get_stream('dose_efficacy')
         self.drug_effects = {m: builder.value.register_value_producer(f'{m}.effect_size', self.get_drug_effect)
                              for m in self.drugs}
 
         self.treatment_effect = builder.value.register_value_producer('hypertension_meds.effect_size',
-                                                                      self.get_treatment_effect)
+                                                                      self.get_treatment_effect, ) #requires_columns=[DOSAGE_COLUMNS])
 
-        builder.value.register_value_modifier('high_systolic_blood_pressure.exposure', self.treat_sbp)
+        builder.value.register_value_modifier('high_systolic_blood_pressure.exposure', self.treat_sbp, )
+                                              #requires_columns=[self.shift_column], requires_values=['hypertension_meds.effect_size'])
 
     def on_initialize_simulants(self, pop_data):
         self.drug_efficacy = self.drug_efficacy.append(self.determine_drug_efficacy(pop_data.index))

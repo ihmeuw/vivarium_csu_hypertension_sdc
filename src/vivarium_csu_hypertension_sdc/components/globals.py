@@ -10,3 +10,5 @@ ILLEGAL_DRUG_COMBINATION = {'ace_inhibitors', 'angiotensin_ii_blockers'}
 SINGLE_PILL_COLUMNS = [f'{d}_in_single_pill' for d in HYPERTENSION_DRUGS]
 
 DOSAGE_COLUMNS = [f'{d}_dosage' for d in HYPERTENSION_DRUGS]
+
+MIN_PDC_FOR_ADHERENT = 0.8

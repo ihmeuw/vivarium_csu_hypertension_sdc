@@ -30,7 +30,7 @@ class DummyAdherence:
         return f'dummy_adherence({self.adherence})'
 
     def setup(self, builder):
-        self.adherence_pipeline = builder.value.register_value_producer('hypertension_meds.adherence',
+        self.adherence_pipeline = builder.value.register_value_producer('hypertension_meds.pdc',
                                               source=lambda index: pd.Series(self.adherence, index=index))
 
         builder.value.register_value_modifier('hypertension_meds.effect_size', self.modify_meds_effect)
