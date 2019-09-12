@@ -5,7 +5,7 @@ import pandas as pd
 
 from vivarium.framework.randomness import RandomnessStream
 from vivarium_csu_hypertension_sdc.components.globals import (HYPERTENSION_DRUGS, HYPERTENSION_DOSAGES,
-                                                              ILLEGAL_DRUG_COMBINATION)
+                                                              ILLEGAL_DRUG_COMBINATION, DOSAGE_COLUMNS)
 
 SINGLE_PILL_COLUMNS = [f'{d}_in_single_pill' for d in HYPERTENSION_DRUGS]
 
@@ -149,3 +149,17 @@ def get_initial_dosages(drugs: pd.DataFrame, randomness: RandomnessStream) -> pd
 
     return drug_dosages
 
+
+def get_num_pills(drug_specs: pd.DataFrame):
+    """Based on number of drugs prescribed + number of drugs in a single pill
+    combination, return a series with the number of pills prescribed."""
+    num_drugs = drug_specs[DOSAGE_COLUMNS].mask(drug_specs[DOSAGE_COLUMNS] > 0, 1).sum(axis=1)
+    num_drugs_in_single_pill = drug_specs[SINGLE_PILL_COLUMNS].sum(axis=1)
+
+    num_pills = pd.Series(0, index=drug_specs.index)
+
+    taking_single_pill_mask = num_drugs_in_single_pill > 0
+    num_pills.loc[~taking_single_pill_mask] = num_drugs.loc[~taking_single_pill_mask]
+    num_pills.loc[taking_single_pill_mask] = (num_drugs.loc[taking_single_pill_mask]
+                                              - num_drugs_in_single_pill[taking_single_pill_mask] + 1)
+    return num_pills
