@@ -120,7 +120,15 @@ def generate_category_drug_combos(med_probabilities: pd.DataFrame, category: str
     return drug_combinations
 
 
-def get_dosages(drugs: pd.DataFrame, randomness: RandomnessStream) -> pd.DataFrame:
+def get_initial_drugs_given_category(med_probabilities: pd.DataFrame, category: str,
+                                     in_category_index: pd.Index, randomness: RandomnessStream) -> pd.DataFrame:
+    options = generate_category_drug_combos(med_probabilities, category)
+    choices_idx = randomness.choice(in_category_index, choices=options.index, p=options.value,
+                                    additional_key='drug_choice')
+    return options.loc[choices_idx, HYPERTENSION_DRUGS + SINGLE_PILL_COLUMNS].set_index(in_category_index)
+
+
+def get_initial_dosages(drugs: pd.DataFrame, randomness: RandomnessStream) -> pd.DataFrame:
     # dosage for single pill combination
     dosages = randomness.choice(drugs.index, HYPERTENSION_DOSAGES, additional_key='single_pill_dosage_choice')
     dosages = np.outer(dosages.values, np.ones(5))

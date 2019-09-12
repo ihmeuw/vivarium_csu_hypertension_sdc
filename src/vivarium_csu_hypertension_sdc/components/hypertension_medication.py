@@ -47,13 +47,11 @@ class BaselineCoverage:
         # choose drug/pill combination first
         drugs = pd.DataFrame(columns=HYPERTENSION_DRUGS + self._single_pill_columns, index=initially_treated.index)
         for cat, idx in cat_groups.iteritems():
-            options = utilities.generate_category_drug_combos(self.med_probabilities, cat)
-            choices_idx = self.randomness.choice(idx, choices=options.index, p=options.value,
-                                                 additional_key='drug_choice')
-            drugs.loc[idx] = options.loc[choices_idx, HYPERTENSION_DRUGS + self._single_pill_columns].set_index(idx)
+            drugs.loc[idx] = utilities.get_initial_drugs_given_category(self.med_probabilities, cat,
+                                                                        idx, self.randomness)
 
         # then select dosages
-        drugs.loc[:, HYPERTENSION_DRUGS] = utilities.get_dosages(drugs, self.randomness)
+        drugs.loc[:, HYPERTENSION_DRUGS] = utilities.get_initial_dosages(drugs, self.randomness)
 
         medications.loc[initially_treated.index] = drugs.rename(columns={d: f'{d}_dosage' for d in HYPERTENSION_DRUGS})
 
