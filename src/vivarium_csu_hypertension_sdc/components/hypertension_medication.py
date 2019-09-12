@@ -50,25 +50,12 @@ class BaselineCoverage:
             options = utilities.generate_category_drug_combos(self.med_probabilities, cat)
             choices_idx = self.randomness.choice(idx, choices=options.index, p=options.value,
                                                  additional_key='drug_choice')
-            drugs.loc[idx] = options.loc[choices_idx].set_index(idx)
+            drugs.loc[idx] = options.loc[choices_idx, HYPERTENSION_DRUGS + self._single_pill_columns].set_index(idx)
 
         # then select dosages
-        num_drugs = drugs[HYPERTENSION_DRUGS].sum(axis=1)
-        num_in_single_pill = drugs[self._single_pill_columns].sum(axis=1)
+        drugs.loc[:, HYPERTENSION_DRUGS] = utilities.get_dosages(drugs, self.randomness)
 
-        num_pills = num_drugs
-        num_pills.loc[num_in_single_pill > 0] = num_drugs - num_in_single_pill + 1
-
-
-
-
-
-        medications.loc[mono_index, self._dosage_columns] = utilities.get_mono_dosages(mono_index,
-                                                                                       self.med_probabilities,
-                                                                                       self.randomness)
-
-        # dual therapy category
-
+        medications.loc[initially_treated.index] = drugs.rename(columns={d: f'{d}_dosage' for d in HYPERTENSION_DRUGS})
 
         self.population_view.update(medications)
 
