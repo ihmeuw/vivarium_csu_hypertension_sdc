@@ -162,3 +162,15 @@ def get_num_pills(drug_specs: pd.DataFrame):
     num_pills.loc[taking_single_pill_mask] = (num_drugs.loc[taking_single_pill_mask]
                                               - num_drugs_in_single_pill[taking_single_pill_mask] + 1)
     return num_pills
+
+
+def get_durations_in_range(randomness, low: int, high: int, index: pd.Index, randomness_key=None):
+    """Get pd.Timedelta durations between low and high days, both inclusive for
+    given index using giving randomness."""
+    durations = pd.Series([])
+    if not index.empty:
+        to_time_delta = np.vectorize(lambda d: pd.Timedelta(days=d))
+        np.random.seed(randomness.get_seed(randomness_key))
+        durations = pd.Series(to_time_delta(np.random.random_integers(low=low, high=high, size=len(index))), index=index)
+    return durations
+
