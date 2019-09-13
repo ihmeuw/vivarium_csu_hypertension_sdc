@@ -1,8 +1,10 @@
 from itertools import combinations
+from scipy import stats
 
 import numpy as np
 import pandas as pd
 
+from risk_distributions.risk_distributions import Beta
 from vivarium.framework.randomness import RandomnessStream
 from vivarium_csu_hypertension_sdc.components.globals import (HYPERTENSION_DRUGS, HYPERTENSION_DOSAGES,
                                                               ILLEGAL_DRUG_COMBINATION, DOSAGE_COLUMNS,
@@ -174,3 +176,12 @@ def get_durations_in_range(randomness, low: int, high: int, index: pd.Index, ran
         durations = pd.Series(to_time_delta(np.random.random_integers(low=low, high=high, size=len(index))), index=index)
     return durations
 
+
+def get_therapeutic_inertia_probability(mean, sd, randomness):
+    params = Beta._get_parameters(mean=pd.Series(mean), sd=pd.Series(sd),
+                                  x_min=pd.Series(0), x_max=pd.Series(1))
+    dist = stats.beta(**params)
+    seed = randomness.get_seed(additional_key='threshold')
+    np.random.seed(seed)
+    draw = np.random.random()
+    return dist.ppf(draw)

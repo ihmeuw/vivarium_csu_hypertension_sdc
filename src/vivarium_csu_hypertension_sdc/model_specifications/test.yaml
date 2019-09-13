@@ -11,6 +11,7 @@ components:
         - DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '120', '150')
         - BaselineCoverage()
         - TreatmentEffect()
+        - TreatmentAlgorithm()
 
 configuration:
     input_data:
