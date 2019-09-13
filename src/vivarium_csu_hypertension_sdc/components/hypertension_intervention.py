@@ -20,6 +20,9 @@ class TreatmentAlgorithm:
             'adverse_events': {
                 'mean': 0.1373333333,
                 'sd': 0.03069563849,
+            },
+            'followup_visit_interval': {
+                'weeks': 12  # ~ 3 months
             }
         }
     }
@@ -35,12 +38,15 @@ class TreatmentAlgorithm:
 
         self.config = builder.configuration.hypertension_treatment
 
+        self.followup_visit_interval_days = self.config.followup_visit_interval.weeks * 7
+
         columns_created = ['followup_date', 'last_visit_date', 'last_visit_type',
                            'high_systolic_blood_pressure_measurement',
                            'high_systolic_blood_pressure_last_measurement_date']
         builder.population.initializes_simulants(self.on_initialize_simulants,
                                                  requires_columns=DOSAGE_COLUMNS,
-                                                 creates_columns=columns_created)
+                                                 creates_columns=columns_created,)
+                                                 #requires_streams=['followup_scheduling'])
         self.population_view = builder.population.get_view(DOSAGE_COLUMNS + columns_created + ['alive'],
                                                            query='alive == "alive"')
 
@@ -72,12 +78,12 @@ class TreatmentAlgorithm:
                                    'high_systolic_blood_pressure_last_measurement_date': pd.NaT},
                                   index=pop_data.index)
 
-        durations = utilities.get_durations_in_range(self.randomness['followup_scheduling'],
-                                           low=0, high=3*28,
-                                           index=sims_on_tx)
+        durations = utilities.get_days_in_range(self.randomness['followup_scheduling'],
+                                                low=0, high=self.followup_visit_interval_days,
+                                                index=sims_on_tx)
         initialize.loc[sims_on_tx, 'followup_date'] = durations + self.sim_start
-        initialize.loc[sims_on_tx, 'last_visit_date'] = self.sim_start - durations
-
+        initialize.loc[sims_on_tx, 'last_visit_date'] = (self.sim_start
+                                                         - pd.Timedelta(self.followup_visit_interval_days))
         self.population_view.update(initialize)
 
     def on_time_step(self, event):
