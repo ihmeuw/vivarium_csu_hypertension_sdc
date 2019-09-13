@@ -7,10 +7,14 @@ import pandas as pd, numpy as np
 import yaml
 from pandas.plotting import register_matplotlib_converters
 
-OFFSETS = {'tx profile': -17,
-          'dr visits': -10,
+from vivarium_csu_hypertension_sdc.components.globals import (HYPERTENSIVE_CONTROLLED_THRESHOLD, HYPERTENSION_DRUGS,
+                                                              DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS)
+
+DOSE_ADJUST = 5
+
+OFFSETS = {'dr visits': -10,
           'disease events': -5,
-          'rx filled': -14}
+           'meds': -30}
 
 
 class SimulantTrajectoryVisualizer:
@@ -37,12 +41,11 @@ class SimulantTrajectoryVisualizer:
 
     def visualize_simulant_trajectory(self, enter_sim_id=False):
         data = self.data
-        step_size = self.step_size
 
         unique_sims = data.reset_index().simulant.drop_duplicates().sort_values()
 
         if not enter_sim_id:
-            arg = (1, len(unique_sims)+1, 1)
+            arg = (1, len(unique_sims), 1)
         else:
             arg = Text(value=str(unique_sims[0]), placeholder='simulant id')
 
@@ -68,11 +71,24 @@ class SimulantTrajectoryVisualizer:
 
             plt.ylabel('mmHg')
             sbp_ticks = [x for x in range(min_sbp, max_sbp, 20)]
-            plt.yticks(ticks=[min_sbp + o for o in OFFSETS.values()] + sbp_ticks,
-                       labels=list(OFFSETS.keys()) + sbp_ticks)
+
+            offset_ticks = []
+            offset_labels = []
+            for k, o in OFFSETS.items():
+                if k != 'meds':
+                    offset_ticks.append(min_sbp + o)
+                    offset_labels.append(k)
+                else:
+                    offset_ticks.extend([min_sbp + o + d * DOSE_ADJUST for d in [0, 0.5, 1, 2]])
+                    offset_labels.extend(['none', 'half', 'single', 'double'])
+
+            plt.yticks(ticks=offset_ticks + sbp_ticks,
+                       labels=offset_labels + sbp_ticks)
             axes = plt.gca()
-            axes.set_ylim((min_sbp - 20, max_sbp + 5))
+            axes.set_ylim((min_sbp + min(OFFSETS.values()) - 2, max_sbp + 5))
             axes.set_xlim(simulant.index[0])
+
+            plot_tx_changes_in_trajectory(simulant, min_sbp)
 
             plt.legend()
 
@@ -92,6 +108,30 @@ class SimulantTrajectoryVisualizer:
             plt.title(f'Trajectory for simulant {sim_id}: a {age} year-old {sex}')
 
         return _visualize_simulant_trajectory
+
+    def visualize_simulant_treatments(self, enter_sim_id=False):
+        data = self.data
+
+        unique_sims = data.reset_index().simulant.drop_duplicates().sort_values()
+
+        if not enter_sim_id:
+            arg = (1, len(unique_sims), 1)
+        else:
+            arg = Text(value=str(unique_sims[0]), placeholder='simulant id')
+
+        @interact(simulant=arg, treatment_graph_style=['line', 'bar'])
+        def _visualize_simulant_treatments(simulant, treatment_graph_style):
+            if isinstance(simulant, str):
+                sim_id = int(simulant)
+            else:
+                sim_id = unique_sims.loc[simulant]
+            simulant = data.loc[sim_id]
+
+            tx_changes = track_treatment_changes(simulant)
+
+            plot_treatments(tx_changes, treatment_graph_style)
+
+        return _visualize_simulant_treatments
 
 
 def load_data(results_path, sample_history_file) -> pd.DataFrame:
@@ -139,45 +179,22 @@ def get_dr_visits(simulant):
     return visits
 
 
-def track_profiles(simulant):
-    profile_changes = pd.DataFrame(columns=['start', 'end', 'profile'])
-    curr = {'start': simulant.index[0], 'end': pd.NaT, 'profile': simulant.treatment_profile[0]}
+def track_treatment_changes(simulant):
+    simulant = simulant[DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS]
+    tx_changes = pd.DataFrame(columns=['start', 'end', 'drug', 'dose', 'in_single_pill'])
+    curr = {'start': simulant.index[0], 'end': pd.NaT, 'tx': simulant.iloc[0]}
 
-    for time, profile in simulant.treatment_profile.iteritems():
-        if profile != curr['profile'] or time == simulant.index[-1]:
-            curr['end'] = time
-            profile_changes = profile_changes.append(curr, ignore_index=True)
-            curr['start'] = time
-            curr['profile'] = profile
-
-    return profile_changes
-
-
-def get_color_for_profile(p):
-    if p == 'no_treatment_1':
-        return 'darkgrey'
-    elif 'initial' in p:
-        return 'bisque'
-    elif 'mono' in p:
-        starting = 'lightcoral'
-        delta = [0.1, 0.05, 0.01]
-    elif 'combo' in p:
-        starting = 'palegreen'
-        delta = [0.05, 0.1, 0.05]
-    elif 'elderly' in p:
-        starting = 'lightblue'
-        delta = [0.01, 0.02, 0.1]
-
-    position = float(p.split('_')[-1])
-    c = list(colors.to_rgb(starting))
-    return [min(v - position * d, 1) for v, d in zip(c, delta)]
-
-
-def plot_tx_profiles(simulant):
-    profiles = track_profiles(simulant)
-    for p in profiles.itertuples():
-        color = get_color_for_profile(p.profile)
-        plt.axvspan(p.start, p.end, ymin=0, ymax=0.1, alpha=0.35, color=color, label=p.profile)
+    for row in simulant.iterrows():
+        if tx_changes.empty or row[1].to_dict() != curr['tx'].to_dict() or row[0] == simulant.index[-1]:
+            curr['end'] = row[0]
+            for drug, dosage, s in zip(HYPERTENSION_DRUGS, DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS):
+                dose = curr['tx'][dosage]
+                in_single = curr['tx'][s]
+                tx_changes = tx_changes.append({'start': curr['start'], 'end': curr['end'], 'drug': drug,
+                                                'dose': dose, 'in_single_pill': in_single}, ignore_index=True)
+            curr['start'] = row[0]
+            curr['tx'] = row[1]
+    return tx_changes
 
 
 def plot_sbp(simulant):
@@ -189,6 +206,7 @@ def plot_sbp(simulant):
              linewidth=2, drawstyle='steps-post', color='lightblue')
     plt.scatter(sbp_measurements.index, sbp_measurements.high_systolic_blood_pressure_measurement,
                 label='SBP Measurement', color='slateblue', marker='x', s=200)
+    plt.axhline(y=HYPERTENSIVE_CONTROLLED_THRESHOLD, color='darkred', label='SBP controlled threshold')
 
 
 def plot_dr_visits(simulant, min_sbp):
@@ -212,12 +230,81 @@ def plot_disease_events(simulant, min_sbp):
                         label=e, marker='D', s=150, color=color, edgecolors='black')
 
 
-def plot_medication(simulant, min_sbp):
-    rx = simulant.rx_filled.apply(lambda x: colors.to_rgb('g') if x else colors.to_rgb('r'))
-    plt.scatter(rx.index, [min_sbp + OFFSETS['rx filled']] * len(rx), c=np.stack(rx.values), cmap=plt.get_cmap('Set1'))
-
-
 def plot_dead(simulant):
     if 'dead' in simulant.alive.unique():
         death_time = sorted(simulant.exit_time.unique())[-1]
         plt.axvspan(death_time, simulant.index[-1], alpha=0.25, color='lightgrey', label='dead')
+
+
+def plot_treatments(tx_changes, style='line'):
+    if style == 'line':
+        for drug in tx_changes.drug.unique():
+            df = tx_changes.loc[tx_changes.drug == drug]
+            plt.plot(df.start, df.dose, label=drug, drawstyle='steps-post')
+
+        in_single = tx_changes.loc[tx_changes.in_single_pill == 0]
+        plt.scatter(in_single.start, in_single.dose, marker='^', s=200, label='in single pill',
+                    color='white', edgecolor='black')
+
+        not_in_single = tx_changes.loc[tx_changes.in_single_pill == 1]
+        plt.scatter(not_in_single.start, not_in_single.dose, marker='o', s=200, label='not in single pill',
+                    color='white', edgecolor='black')
+
+        plt.yticks([0, 0.5, 1, 2], ['none', 'half', 'single', 'double'])
+
+        plt.legend()
+        plt.show()
+    elif style == 'bar':
+        # FIXME: haven't come up with a clever way to show which drugs are in a single pill yet - I wanted to hatch
+        #  those bars but you can't hatch just some bars easily
+        barwidth = 0.1
+
+        drug_colors = ['red', 'blue', 'green', 'yellow', 'purple']
+
+        num_changes = len(tx_changes.start.unique())
+        base_positions = np.arange(num_changes)
+
+        for i, drug in enumerate(HYPERTENSION_DRUGS):
+            group = tx_changes.loc[tx_changes.drug == drug].sort_values('start')
+            positions = [x + barwidth * i for x in base_positions]
+            color = drug_colors[i]
+            heights = group.dose
+
+            plt.bar(positions, heights, width=barwidth, color=color, edgecolor='white', label=drug)
+
+        for i in range(num_changes):
+            plt.axvline(base_positions[i] + (len(HYPERTENSION_DRUGS)) * barwidth, color='black',
+                        linewidth=4, linestyle='dashed')
+
+        plt.xlabel('date', fontweight='bold')
+        plt.xticks([r + barwidth for r in range(len(HYPERTENSION_DRUGS))],
+                   sorted([pd.Timestamp(d).strftime("%Y-%m-%d") for d in tx_changes.start.unique()]),
+                   rotation=90)
+        plt.yticks([0, 0.5, 1, 2], ['none', 'half', 'single', 'double'])
+
+        plt.legend()
+        plt.show()
+    else:
+        raise ValueError(f'The only acceptable values for style are "line" or '
+                         f'"bar". You provided {style}.')
+
+
+def plot_tx_changes_in_trajectory(simulant, min_sbp):
+    tx_changes = track_treatment_changes(simulant)
+
+    baseline = min_sbp + OFFSETS['meds']
+    tx_changes.dose = tx_changes.dose * DOSE_ADJUST + baseline
+
+    for drug in tx_changes.drug.unique():
+        df = tx_changes.loc[tx_changes.drug == drug]
+        plt.plot(df.start, df.dose, label=drug, drawstyle='steps-post')
+
+    in_single = tx_changes.loc[tx_changes.in_single_pill == 0]
+    plt.scatter(in_single.start, in_single.dose, marker='^', s=200, label='in single pill',
+                color='white', edgecolor='black')
+
+    not_in_single = tx_changes.loc[tx_changes.in_single_pill == 1]
+    plt.scatter(not_in_single.start, not_in_single.dose, marker='o', s=200, label='not in single pill',
+                color='white', edgecolor='black')
+
+
