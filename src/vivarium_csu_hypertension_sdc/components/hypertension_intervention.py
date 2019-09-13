@@ -123,9 +123,9 @@ class TreatmentAlgorithm:
                                                                                    np.tile(self.ti_probability,
                                                                                            sum(eligible_for_tx_mask)),
                                                                                    additional_key='lost_to_ti')
-        uncontrolled = index[eligible_for_tx_mask].difference(lost_to_ti)
-        self.transition_treatment(uncontrolled)
-        self.schedule_followup(uncontrolled, visit_date)  # schedule only for those who started tx
+        start_tx = index[eligible_for_tx_mask].difference(lost_to_ti)
+        self.transition_treatment(start_tx)
+        self.schedule_followup(start_tx, visit_date)  # schedule only for those who started tx
 
     def measure_sbp(self, index, visit_date):
         true_exp = self.sbp(index)
