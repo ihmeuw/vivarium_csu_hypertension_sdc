@@ -45,7 +45,7 @@ class BaselineCoverage:
 
         self.pdc = builder.value.register_value_producer('hypertension_meds.pdc', self.get_pdc,)
                                                          #requires_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS
-                                                                           + adherence_columns),
+                                                                            # + adherence_columns),
                                                          #requires_values=[])
         builder.value.register_value_modifier('hypertension_meds.effect_size', self.modify_meds_effect_with_pdc)
 
