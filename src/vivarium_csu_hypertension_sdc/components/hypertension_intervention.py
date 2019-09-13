@@ -160,6 +160,7 @@ class TreatmentAlgorithm:
         return index
 
     def schedule_followup(self, index, visit_date):
-        next_followup_date = pd.Series(visit_date + pd.Timedelta(days=3*28), index=index, name='followup_date')
+        next_followup_date = pd.Series(visit_date + pd.Timedelta(days=self.followup_visit_interval_days),
+                                       index=index, name='followup_date')
         self.population_view.update(next_followup_date)
 
