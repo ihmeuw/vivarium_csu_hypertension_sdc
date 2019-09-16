@@ -22,9 +22,7 @@ class TreatmentAlgorithm:
                 'mean': 0.1373333333,
                 'sd': 0.03069563849,
             },
-            'followup_visit_interval': {
-                'weeks': 12  # ~ 3 months
-            },
+            'followup_visit_interval': 90,  # days
             'treatment_ramp': 'low_and_slow'  # one of ["low_and_slow", "free_choice", "fixed_dose_combination"]
         }
     }
@@ -40,7 +38,7 @@ class TreatmentAlgorithm:
 
         self.config = builder.configuration.hypertension_treatment
 
-        self.followup_visit_interval_days = self.config.followup_visit_interval.weeks * 7
+        self.followup_visit_interval_days = self.config.followup_visit_interval
 
         columns_created = ['followup_date', 'last_visit_date', 'last_visit_type',
                            'high_systolic_blood_pressure_measurement',
@@ -81,11 +79,11 @@ class TreatmentAlgorithm:
                                   index=pop_data.index)
 
         durations = utilities.get_days_in_range(self.randomness['followup_scheduling'],
-                                                low=0, high=self.followup_visit_interval_days,
+                                                low=0, high=self.config.followup_visit_interval,
                                                 index=sims_on_tx)
         initialize.loc[sims_on_tx, 'followup_date'] = durations + self.sim_start
         initialize.loc[sims_on_tx, 'last_visit_date'] = (self.sim_start
-                                                         - pd.Timedelta(self.followup_visit_interval_days))
+                                                         - pd.Timedelta(self.config.followup_visit_interval))
         self.population_view.update(initialize)
 
     def on_time_step(self, event):
@@ -166,7 +164,7 @@ class TreatmentAlgorithm:
         return index
 
     def schedule_followup(self, index, visit_date):
-        next_followup_date = pd.Series(visit_date + pd.Timedelta(days=self.followup_visit_interval_days),
+        next_followup_date = pd.Series(visit_date + pd.Timedelta(days=self.config.followup_visit_interval),
                                        index=index, name='followup_date')
         self.population_view.update(next_followup_date)
 

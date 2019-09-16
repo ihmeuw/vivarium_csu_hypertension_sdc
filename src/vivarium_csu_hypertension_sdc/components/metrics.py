@@ -9,14 +9,14 @@ class SimulantTrajectoryObserver:
         'metrics': {
             'sample_history_observer': {
                 'sample_size': 1000,
-                'path': f'/share/costeffectiveness/results/vivarium_csu_hypertension_sdc/sample_history.hdf'
+                'path': f'/share/costeffectiveness/results/vivarium_csu_hypertension_sdc/simulant_trajectory.hdf'
             }
         }
     }
 
     @property
     def name(self):
-        return "sample_history_observer"
+        return "simulant_trajectory_observer"
 
     def __init__(self):
         self.history_snapshots = []
@@ -25,10 +25,10 @@ class SimulantTrajectoryObserver:
     def setup(self, builder):
         self.clock = builder.time.clock()
         self.sample_history_parameters = builder.configuration.metrics.sample_history_observer
-        self.randomness = builder.randomness.get_stream("sample_history")
+        self.randomness = builder.randomness.get_stream("simulant_trajectory")
 
         # sets the sample index
-        builder.population.initializes_simulants(self.get_sample_index)
+        builder.population.initializes_simulants(self.on_initialize_simulants)
 
         columns_required = ['alive', 'age', 'sex', 'entrance_time', 'exit_time',
                             # 'cause_of_death', # FIXME: put this back in once the full artifact is built and we can use the Mortality component
@@ -50,10 +50,10 @@ class SimulantTrajectoryObserver:
 
         # record on time_step__prepare to make sure all pipelines + state table
         # columns are reflective of same time
-        builder.event.register_listener('time_step__prepare', self.record)
-        builder.event.register_listener('simulation_end', self.dump)
+        builder.event.register_listener('time_step__prepare', self.on_time_step__prepare)
+        builder.event.register_listener('simulation_end', self.on_simulation_end)
 
-    def get_sample_index(self, pop_data):
+    def on_initialize_simulants(self, pop_data):
         sample_size = self.sample_history_parameters.sample_size
         if sample_size is None or sample_size > len(pop_data.index):
             sample_size = len(pop_data.index)
@@ -61,7 +61,7 @@ class SimulantTrajectoryObserver:
         priority_index = [i for d, i in sorted(zip(draw, pop_data.index), key=lambda x:x[0])]
         self.sample_index = pd.Index(priority_index[:sample_size])
 
-    def record(self, event):
+    def on_time_step__prepare(self, event):
         pop = self.population_view.get(self.sample_index)
 
         pipeline_results = []
@@ -77,7 +77,7 @@ class SimulantTrajectoryObserver:
 
         self.history_snapshots.append(record)
 
-    def dump(self, event):
-        self.record(event)  # record once more since we were recording at the beginning of each time step
+    def on_simulation_end(self, event):
+        self.on_time_step__prepare(event)  # record once more since we were recording at the beginning of each time step
         sample_history = pd.concat(self.history_snapshots, axis=0)
-        sample_history.to_hdf(self.sample_history_parameters.path, key='histories')
+        sample_history.to_hdf(self.sample_history_parameters.path, key='trajectories')
