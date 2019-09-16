@@ -5,7 +5,7 @@ import pandas as pd
 
 from vivarium_csu_hypertension_sdc.components import utilities
 from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, HYPERTENSIVE_CONTROLLED_THRESHOLD,
-                                                              SINGLE_PILL_COLUMNS)
+                                                              SINGLE_PILL_COLUMNS, HYPERTENSION_DOSAGES)
 
 
 class TreatmentAlgorithm:
@@ -40,6 +40,8 @@ class TreatmentAlgorithm:
 
         self.followup_visit_interval_days = self.config.followup_visit_interval
 
+        self.med_probabilities = builder.data.load('health_technology.hypertension_medication.medication_probabilities')
+
         columns_created = ['followup_date', 'last_visit_date', 'last_visit_type',
                            'high_systolic_blood_pressure_measurement',
                            'high_systolic_blood_pressure_last_measurement_date']
@@ -53,7 +55,8 @@ class TreatmentAlgorithm:
         self.randomness = {'followup_scheduling': builder.randomness.get_stream('followup_scheduling'),
                            'background_visit_attendance': builder.randomness.get_stream('background_visit_attendance'),
                            'sbp_measurement': builder.randomness.get_stream('sbp_measurement'),
-                           'therapeutic_inertia': builder.randomness.get_stream('therapeutic_intertia')
+                           'therapeutic_inertia': builder.randomness.get_stream('therapeutic_intertia'),
+                           'treatment_transition': builder.randomness.get_stream('treatment_transition')
                            }
 
         self.ti_probability = utilities.get_therapeutic_inertia_probability(self.config.therapeutic_inertia.mean,
@@ -152,16 +155,53 @@ class TreatmentAlgorithm:
         return sbp_measurement
 
     def transition_treatment(self, index):
-        # TODO
-        current_tx = self.population_view.subview(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS).get(index)
+        current_meds = self.population_view.subview(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS).get(index)
+
+        no_current_tx_mask = current_meds[DOSAGE_COLUMNS].sum(axis=1) == 0
+
         if self.config.treatment_ramp == "low_and_slow":
+            if sum(no_current_tx_mask):
+                current_meds.loc[no_current_tx_mask, DOSAGE_COLUMNS] = \
+                    utilities.choose_half_dose_single_new_drug(index[no_current_tx_mask], self.med_probabilities,
+                                                               self.randomness['treatment_transition'],
+                                                               current_meds.loc[no_current_tx_mask, DOSAGE_COLUMNS])
 
+            increase_tx = index[~no_current_tx_mask]
+            min_dose_drugs_mask, min_dose_drug_in_single_pill = \
+                utilities.get_minimum_dose_drug(current_meds.loc[increase_tx])
 
-            # FIXME: this distribution should actually be from data - just using uniform for rn
+            at_max = current_meds.loc[increase_tx].mask(np.logical_not(min_dose_drugs_mask), 0).max(axis=1) == max(HYPERTENSION_DOSAGES)
+
+            # already on treatment and maxed out on dosage of minimum dose drug - add half dose of new drug
+            idx = increase_tx[at_max]
+            if not idx.empty:
+                current_meds.loc[idx, DOSAGE_COLUMNS] += \
+                    utilities.choose_half_dose_single_new_drug(idx, self.med_probabilities,
+                                                               self.randomness['treatment_transition'],
+                                                               current_meds.loc[idx, DOSAGE_COLUMNS])
+
+            # already on treatment and minimum dose drug is in a single pill - double doses of all drugs in pill
+            double_pill = increase_tx[~at_max & min_dose_drug_in_single_pill.loc[increase_tx[~at_max]]]
+            if not double_pill.empty:
+                in_pill_mask = np.logical_and(current_meds.loc[double_pill, DOSAGE_COLUMNS].mask(
+                    current_meds.loc[double_pill, DOSAGE_COLUMNS] > 0, 1), current_meds.loc[double_pill, SINGLE_PILL_COLUMNS])
+                current_meds.loc[double_pill, DOSAGE_COLUMNS] += (current_meds.loc[double_pill, DOSAGE_COLUMNS]
+                                                                  .mask(~in_pill_mask, 0))
+
+            # already on treatment and minimum dose drug is not in a single pill - double dose of min dose drug
+            double_dose = increase_tx[~at_max & np.logical_not(min_dose_drug_in_single_pill.loc[increase_tx[~at_max]])]
+            if not double_dose.empty:
+                current_meds.loc[double_dose, DOSAGE_COLUMNS] += (current_meds.loc[double_dose, DOSAGE_COLUMNS]
+                    .mask(np.logical_not(min_dose_drugs_mask.loc[double_dose]), 0))
+
+        self.population_view.update(current_meds)
 
     def check_treatment_increase_possible(self, index):
-        # TODO
-        return index
+        dosages = self.population_view.subview(DOSAGE_COLUMNS).get(index)
+        if self.config.treatment_ramp == 'low_and_slow':
+            no_tx_increase_mask = dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)  # 3 drugs, each on a max dosage
+
+        return index[~no_tx_increase_mask]
 
     def schedule_followup(self, index, visit_date):
         next_followup_date = pd.Series(visit_date + pd.Timedelta(days=self.config.followup_visit_interval),
