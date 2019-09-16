@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 
 from vivarium_csu_hypertension_sdc.components import utilities
-from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, HYPERTENSIVE_CONTROLLED_THRESHOLD)
+from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, HYPERTENSIVE_CONTROLLED_THRESHOLD,
+                                                              SINGLE_PILL_COLUMNS)
 
 
 class TreatmentAlgorithm:
@@ -23,7 +24,8 @@ class TreatmentAlgorithm:
             },
             'followup_visit_interval': {
                 'weeks': 12  # ~ 3 months
-            }
+            },
+            'treatment_ramp': 'low_and_slow'  # one of ["low_and_slow", "free_choice", "fixed_dose_combination"]
         }
     }
 
@@ -153,7 +155,11 @@ class TreatmentAlgorithm:
 
     def transition_treatment(self, index):
         # TODO
-        pass
+        current_tx = self.population_view.subview(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS).get(index)
+        if self.config.treatment_ramp == "low_and_slow":
+
+
+            # FIXME: this distribution should actually be from data - just using uniform for rn
 
     def check_treatment_increase_possible(self, index):
         # TODO

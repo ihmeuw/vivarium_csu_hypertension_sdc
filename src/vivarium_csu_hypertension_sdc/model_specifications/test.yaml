@@ -8,7 +8,7 @@ components:
         #    - MortalityObserver()
 
     vivarium_csu_hypertension_sdc.components:
-        - DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '120', '150')
+        - DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '145', '150')
         - BaselineCoverage()
         - TreatmentEffect()
         - TreatmentAlgorithm()
@@ -65,3 +65,4 @@ configuration:
             sd: 0.03069563849
         followup_visit_interval:
             weeks: 12
+        treatment_ramp: low_and_slow
