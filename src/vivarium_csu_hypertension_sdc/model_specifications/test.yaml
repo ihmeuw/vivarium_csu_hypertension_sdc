@@ -63,5 +63,4 @@ configuration:
         adverse_events:
             mean: 0.1373333333
             sd: 0.03069563849
-        followup_visit_interval:
-            weeks: 12
+        followup_visit_interval: 90  # days
