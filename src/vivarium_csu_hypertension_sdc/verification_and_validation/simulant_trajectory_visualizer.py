@@ -170,7 +170,7 @@ def get_dr_visits(simulant):
     attended = (simulant.loc[simulant.last_visit_date == simulant.index].groupby(['last_visit_type'])
                 .apply(lambda g: g.last_visit_date.values))
 
-    defaults = {'followup': 'orangered',
+    defaults = {'follow_up': 'orangered',
                 'background': 'forestgreen'}
     visits = dict()
     for visit, color in defaults.items():
@@ -206,7 +206,7 @@ def plot_sbp(simulant):
              linewidth=2, drawstyle='steps-post', color='lightblue')
     plt.scatter(sbp_measurements.index, sbp_measurements.high_systolic_blood_pressure_measurement,
                 label='SBP Measurement', color='slateblue', marker='x', s=200)
-    plt.axhline(y=HYPERTENSIVE_CONTROLLED_THRESHOLD, color='darkred', label='SBP controlled threshold')
+    plt.axhline(y=HYPERTENSIVE_CONTROLLED_THRESHOLD, color='red', label='SBP controlled threshold', linewidth=4)
 
 
 def plot_dr_visits(simulant, min_sbp):
@@ -299,11 +299,11 @@ def plot_tx_changes_in_trajectory(simulant, min_sbp):
         df = tx_changes.loc[tx_changes.drug == drug]
         plt.plot(df.start, df.dose, label=drug, drawstyle='steps-post')
 
-    in_single = tx_changes.loc[tx_changes.in_single_pill == 0]
+    in_single = tx_changes.loc[tx_changes.in_single_pill == 1]
     plt.scatter(in_single.start, in_single.dose, marker='^', s=200, label='in single pill',
                 color='white', edgecolor='black')
 
-    not_in_single = tx_changes.loc[tx_changes.in_single_pill == 1]
+    not_in_single = tx_changes.loc[tx_changes.in_single_pill == 0]
     plt.scatter(not_in_single.start, not_in_single.dose, marker='o', s=200, label='not in single pill',
                 color='white', edgecolor='black')
 
