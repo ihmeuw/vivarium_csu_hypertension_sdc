@@ -187,37 +187,3 @@ def get_therapeutic_inertia_probability(mean, sd, randomness):
     return dist.ppf(draw)
 
 
-def choose_half_dose_single_new_drug(index, med_probabilities, randomness, current_dosages):
-
-    options = (med_probabilities.loc[med_probabilities.measure == 'individual_drug_probability']
-               .rename(columns={d: f'{d}_dosage' for d in HYPERTENSION_DRUGS}))
-
-    # we need to customize the probabilities for each sim so the prob of any drug they're already on is 0
-    probs = options[DOSAGE_COLUMNS].multiply(options.value, axis=0).sum(axis=0).to_frame().transpose()
-    probs = pd.DataFrame(np.tile(probs, (len(index), 1)), columns=probs.columns, index=index)
-    probs *= np.logical_not(current_dosages.mask(current_dosages < 0, 1))
-    probs = probs.divide(probs.sum(axis=1), axis=0)  # normalize so each sim's probs sum to 1
-
-    drug_to_idx_map = {d: options.loc[options[d] == 1].index[0] for d in probs.columns}
-    chosen_drugs = randomness.choice(index, probs.columns, p=probs.values).map(drug_to_idx_map)
-    new_dosages = options.loc[chosen_drugs, DOSAGE_COLUMNS].set_index(index) / 2  # start on half dosage
-    return new_dosages
-
-
-def get_minimum_dose_drug(meds):
-    dosages = meds[DOSAGE_COLUMNS]
-    in_single_pill = meds[SINGLE_PILL_COLUMNS]
-    dosages = dosages.mask(dosages == 0, np.inf)  # mask 0s with inf to more easily identify min non-zero dose
-    min_dosages = dosages.min(axis=1)
-
-    min_dose_drug_mask = pd.DataFrame(0, columns=HYPERTENSION_DRUGS, index=dosages.index)
-    min_dose_in_single_pill = pd.Series(0, index=dosages.index)
-
-    for d in HYPERTENSION_DRUGS:
-        mask = dosages[f'{d}_dosage'] == min_dosages
-        min_dose_drug_mask.loc[mask, HYPERTENSION_DRUGS] = [0 if drug != d else 1 for drug in HYPERTENSION_DRUGS]
-
-        min_dose_in_single_pill.loc[mask] = in_single_pill.loc[mask, f'{d}_in_single_pill']
-
-    return (min_dose_drug_mask.rename(columns={d: f'{d}_dosage' for d in min_dose_drug_mask.columns}),
-            min_dose_in_single_pill)
