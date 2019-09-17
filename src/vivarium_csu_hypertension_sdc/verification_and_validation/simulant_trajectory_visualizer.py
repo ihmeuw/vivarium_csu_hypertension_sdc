@@ -194,6 +194,7 @@ def track_treatment_changes(simulant):
                                                 'dose': dose, 'in_single_pill': in_single}, ignore_index=True)
             curr['start'] = row[0]
             curr['tx'] = row[1]
+
     return tx_changes
 
 
