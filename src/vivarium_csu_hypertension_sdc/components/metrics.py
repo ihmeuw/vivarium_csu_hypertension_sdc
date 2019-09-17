@@ -28,10 +28,14 @@ class SimulantTrajectoryObserver:
         self.randomness = builder.randomness.get_stream("simulant_trajectory")
 
         # sets the sample index
-        builder.population.initializes_simulants(self.on_initialize_simulants)
+        builder.population.initializes_simulants(self.on_initialize_simulants,
+                                                 requires_streams=['simulant_trajectory'],
+                                                 # FIXME: this creates_columns is a hack to get around the resource
+                                                 #  mgr skipping initializers that don't create anything for now
+                                                 creates_columns=['simulant_trajectory'])
 
         columns_required = ['alive', 'age', 'sex', 'entrance_time', 'exit_time',
-                            # 'cause_of_death', # FIXME: put this back in once the full artifact is built and we can use the Mortality component
+                            'cause_of_death',
                             # TODO: add disease event time columns
                             'followup_date',
                             'last_visit_date',

@@ -9,16 +9,21 @@ class DummyContinuousRisk:
         self.risk = EntityString(risk)
         self.low = int(low)
         self.high = int(high)
+        self.exp = pd.Series()
 
     @property
     def name(self):
         return f'dummy_risk.{self.risk}'
 
     def setup(self, builder):
+        builder.population.initializes_simulants(self.on_initialize_simulants)
         builder.value.register_value_producer(f'{self.risk.name}.exposure',
-                                              source=lambda index: pd.Series(np.random.randint(self.low, self.high,
-                                                                                               size=len(index)),
-                                                                             index=index))
+                                              source=lambda index: self.exp.loc[index])
+
+    def on_initialize_simulants(self, pop_data):
+        s = pd.Series(np.random.randint(self.low, self.high, size=len(pop_data.index)), index=pop_data.index)
+        assert np.all(s > 0)
+        self.exp = self.exp.append(s)
 
 
 class DummyAdherence:
