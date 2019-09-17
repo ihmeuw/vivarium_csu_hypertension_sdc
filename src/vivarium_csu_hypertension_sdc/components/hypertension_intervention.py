@@ -47,8 +47,8 @@ class TreatmentAlgorithm:
                            'high_systolic_blood_pressure_last_measurement_date']
         builder.population.initializes_simulants(self.on_initialize_simulants,
                                                  requires_columns=DOSAGE_COLUMNS,
-                                                 creates_columns=columns_created,)
-                                                 #requires_streams=['followup_scheduling'])
+                                                 creates_columns=columns_created,
+                                                 requires_streams=['followup_scheduling'])
         self.population_view = builder.population.get_view(DOSAGE_COLUMNS + columns_created + ['alive'],
                                                            query='alive == "alive"')
 
