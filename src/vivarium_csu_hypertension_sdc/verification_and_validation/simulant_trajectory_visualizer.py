@@ -243,11 +243,11 @@ def plot_treatments(tx_changes, style='line'):
             df = tx_changes.loc[tx_changes.drug == drug]
             plt.plot(df.start, df.dose, label=drug, drawstyle='steps-post')
 
-        in_single = tx_changes.loc[tx_changes.in_single_pill == 0]
+        in_single = tx_changes.loc[tx_changes.in_single_pill == 1]
         plt.scatter(in_single.start, in_single.dose, marker='^', s=200, label='in single pill',
                     color='white', edgecolor='black')
 
-        not_in_single = tx_changes.loc[tx_changes.in_single_pill == 1]
+        not_in_single = tx_changes.loc[tx_changes.in_single_pill == 0]
         plt.scatter(not_in_single.start, not_in_single.dose, marker='o', s=200, label='not in single pill',
                     color='white', edgecolor='black')
 
