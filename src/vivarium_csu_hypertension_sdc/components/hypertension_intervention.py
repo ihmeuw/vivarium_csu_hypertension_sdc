@@ -8,6 +8,7 @@ from vivarium_csu_hypertension_sdc.components import utilities
 from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, HYPERTENSIVE_CONTROLLED_THRESHOLD,
                                                               SINGLE_PILL_COLUMNS, HYPERTENSION_DOSAGES,
                                                               HYPERTENSION_DRUGS, ILLEGAL_DRUG_COMBINATION)
+from vivarium_csu_hypertension_sdc.external_data.globals import FREE_CHOICE_TWO_PILL_PROBABILITY
 
 
 class TreatmentAlgorithm:
@@ -76,8 +77,10 @@ class TreatmentAlgorithm:
         builder.event.register_listener('time_step', self.on_time_step)
 
         transition_funcs = {'low_and_slow': self.transition_low_and_slow,
-                            'fixed_dose_combination': self.transition_fdc}
+                            'fixed_dose_combination': self.transition_fdc,
+                            'free_choice': self.transition_free_choice}
         self._transition_func = transition_funcs[self.config.treatment_ramp]
+        self.free_choice_two_pill_prob = FREE_CHOICE_TWO_PILL_PROBABILITY[builder.configuration.input_data.location]
 
     def on_initialize_simulants(self, pop_data):
         drug_dosages = self.population_view.subview(DOSAGE_COLUMNS).get(pop_data.index)
@@ -261,7 +264,7 @@ class TreatmentAlgorithm:
         return current_meds
 
     def choose_half_dose_new_single_pill(self, index):
-        options = utilities.get_all_legal_drug_combos(2)
+        options = utilities.get_all_legal_drug_combos(num_drugs=2)
         options = pd.concat([options.rename(columns={d: f'{d}_dosage' for d in options}) / 2,  # half dose
                              options.rename(columns={d: f'{d}_in_single_pill' for d in options})], axis=1)  # in single pill
 
@@ -394,3 +397,30 @@ class TreatmentAlgorithm:
             current_meds.loc[idx, SINGLE_PILL_COLUMNS] = put_in_single_pill
 
         return current_meds
+
+    def transition_free_choice(self, index):
+        current_meds = self.population_view.subview(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS).get(index)
+
+        no_current_tx_mask = current_meds[DOSAGE_COLUMNS].sum(axis=1) == 0
+
+        # not currently on any tx
+        if sum(no_current_tx_mask):
+            current_meds.loc[no_current_tx_mask] = self.start_free_choice(index[no_current_tx_mask])
+
+        num_drugs = current_meds[DOSAGE_COLUMNS].mask(current_meds[DOSAGE_COLUMNS] > 0, 1).sum(axis=1).loc[~no_current_tx_mask]
+
+        for n in num_drugs.unique():
+            idx = index[num_drugs == n]
+            if not idx.empty:
+                current_meds.loc[idx] = self.transition_fdc_by_num_current_drugs(idx, n, current_meds.loc[idx])
+
+        return current_meds
+
+    def start_free_choice(self, index):
+        meds = self.choose_half_dose_new_single_pill(index)
+
+        # but we actually don't want all sims to be on a single pill
+        on_two_pills = (self.randomness['treatment_transition']
+                        .filter_for_probability(index, np.tile(self.free_choice_two_pill_prob, len(index))))
+        meds.loc[on_two_pills, SINGLE_PILL_COLUMNS] = 0
+        return meds
