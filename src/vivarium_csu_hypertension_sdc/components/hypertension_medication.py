@@ -58,7 +58,7 @@ class BaselineCoverage:
         cat_groups = initially_treated.groupby(initially_treated).apply(lambda g: g.index)
 
         # choose drug/pill combination first
-        drugs = pd.DataFrame(columns=HYPERTENSION_DRUGS + SINGLE_PILL_COLUMNS, index=initially_treated.index)
+        drugs = pd.DataFrame(columns=HYPERTENSION_DRUGS + SINGLE_PILL_COLUMNS, index=initially_treated.index, dtype=float)
         for cat, idx in cat_groups.iteritems():
             drugs.loc[idx] = utilities.get_initial_drugs_given_category(self.med_probabilities, cat,
                                                                         idx, self.randomness)
