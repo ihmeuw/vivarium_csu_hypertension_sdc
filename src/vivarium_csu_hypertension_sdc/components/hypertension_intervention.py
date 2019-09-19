@@ -50,7 +50,8 @@ class TreatmentAlgorithm:
                                                  requires_columns=DOSAGE_COLUMNS,
                                                  creates_columns=columns_created,
                                                  requires_streams=['followup_scheduling'])
-        self.population_view = builder.population.get_view(DOSAGE_COLUMNS + columns_created + ['alive'],
+        self.population_view = builder.population.get_view(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS + columns_created
+                                                           + ['alive'],
                                                            query='alive == "alive"')
 
         self.randomness = {'followup_scheduling': builder.randomness.get_stream('followup_scheduling'),
@@ -276,7 +277,11 @@ class TreatmentAlgorithm:
 
         # not currently on any tx
         if sum(no_current_tx_mask):
-            current_meds.loc[no_current_tx_mask] = self.choose_half_dose_new_single_pill(index[no_current_tx_mask])
+            new_meds = self.choose_half_dose_new_single_pill(index[no_current_tx_mask])
+
+            assert np.all(new_meds.loc[no_current_tx_mask, SINGLE_PILL_COLUMNS].sum(axis=1) == 2)
+            current_meds.loc[no_current_tx_mask] = new_meds
+            assert np.all(current_meds.loc[no_current_tx_mask, SINGLE_PILL_COLUMNS].sum(axis=1) == 2)
 
         num_drugs = current_meds[DOSAGE_COLUMNS].mask(current_meds[DOSAGE_COLUMNS] > 0, 1).sum(axis=1).loc[~no_current_tx_mask]
 
@@ -366,7 +371,7 @@ class TreatmentAlgorithm:
             # double dosage of drug not in single pill where single pill is already at max dosage
             mask = on_single_pill & ~double_single_possible
             current_meds.loc[index[mask], DOSAGE_COLUMNS] += (current_meds.loc[index[mask], DOSAGE_COLUMNS]
-                                                              .mask(single_pill_dosage_mask, 0))
+                                                              .mask(single_pill_dosage_mask.loc[index[mask]], 0))
             assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
             assert np.all(np.logical_not(current_meds.isna()))
 
@@ -379,8 +384,9 @@ class TreatmentAlgorithm:
             dosages = current_meds.loc[~on_single_pill, DOSAGE_COLUMNS]
             mins = np.tile(min_dosages, (len(DOSAGE_COLUMNS), 1)).transpose()
             maxes = np.tile(max_dosages, (len(DOSAGE_COLUMNS), 1)).transpose()
-
-            two_equal = (np.equal(dosages, mins).sum(axis=1) == 2) | (np.equal(dosages, maxes).sum(axis=1) == 2)
+            two_at_min = np.equal(dosages, mins).sum(axis=1) == 2
+            two_at_max = np.equal(dosages, maxes).sum(axis=1) == 2
+            two_equal = two_at_min | two_at_max
 
             # if no two equal dosages, set 2 highest to double dose in single pill
             idx = index[~on_single_pill][~two_equal]
@@ -396,12 +402,17 @@ class TreatmentAlgorithm:
             # if 2+ have equal dosages, choose 2 and put them in a single pill
             idx = index[~on_single_pill][two_equal]
             dosages = dosages.loc[two_equal]
+            equal_dosage = pd.Series(0, index=index[~on_single_pill])
+            equal_dosage.loc[two_at_min] = min_dosages.loc[two_at_min]
+            equal_dosage.loc[two_at_max] = max_dosages.loc[two_at_max]
+            equal_dosage = equal_dosage.loc[two_equal]
+
             put_in_single_pill = pd.DataFrame(0, columns=SINGLE_PILL_COLUMNS, index=idx)
             # FIXME: we probably actually want to choose 2 at random but that's hard so just choosing first 2 for now
             for c in put_in_single_pill:
                 still_needs_drug = put_in_single_pill.sum(axis=1) < 2
                 put_in_single_pill.loc[still_needs_drug, c] = ((dosages.loc[still_needs_drug,
-                                                                         c.replace('in_single_pill', 'dosage')] > 0)
+                                                                         c.replace('in_single_pill', 'dosage')] == equal_dosage.loc[still_needs_drug])
                                                             .astype(int))
 
             current_meds.loc[idx, SINGLE_PILL_COLUMNS] = put_in_single_pill
