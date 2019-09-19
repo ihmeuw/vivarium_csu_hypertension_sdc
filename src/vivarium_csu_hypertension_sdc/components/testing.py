@@ -16,14 +16,16 @@ class DummyContinuousRisk:
         return f'dummy_risk.{self.risk}'
 
     def setup(self, builder):
-        builder.population.initializes_simulants(self.on_initialize_simulants)
+        builder.population.initializes_simulants(self.on_initialize_simulants, creates_columns=[self.risk.name])
+        self.population_view = builder.population.get_view([self.risk.name])
         builder.value.register_value_producer(f'{self.risk.name}.exposure',
-                                              source=lambda index: self.exp.loc[index])
+                                              source=lambda index: self.population_view.get(index)[self.risk.name],
+                                              requires_columns=[self.risk.name])
 
     def on_initialize_simulants(self, pop_data):
-        s = pd.Series(np.random.randint(self.low, self.high, size=len(pop_data.index)), index=pop_data.index)
-        assert np.all(s > 0)
-        self.exp = self.exp.append(s)
+        s = pd.Series(np.random.randint(self.low, self.high, size=len(pop_data.index)),
+                      index=pop_data.index, name=self.risk.name)
+        self.population_view.update(s)
 
 
 class DummyAdherence:

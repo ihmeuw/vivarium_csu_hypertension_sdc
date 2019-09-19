@@ -10,11 +10,11 @@ from pandas.plotting import register_matplotlib_converters
 from vivarium_csu_hypertension_sdc.components.globals import (HYPERTENSIVE_CONTROLLED_THRESHOLD, HYPERTENSION_DRUGS,
                                                               DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS)
 
-DOSE_ADJUST = 5
+DOSE_ADJUST = 10
 
 OFFSETS = {'dr visits': -10,
           'disease events': -5,
-           'meds': -30}
+           'meds': -50}
 
 
 class SimulantTrajectoryVisualizer:
@@ -128,7 +128,7 @@ class SimulantTrajectoryVisualizer:
             simulant = data.loc[sim_id]
 
             tx_changes = track_treatment_changes(simulant)
-
+            plt.title(f'Treatment transitions for simulant {sim_id}.')
             plot_treatments(tx_changes, treatment_graph_style)
 
         return _visualize_simulant_treatments
@@ -185,7 +185,7 @@ def track_treatment_changes(simulant):
     curr = {'start': simulant.index[0], 'end': pd.NaT, 'tx': simulant.iloc[0]}
 
     for row in simulant.iterrows():
-        if tx_changes.empty or row[1].to_dict() != curr['tx'].to_dict() or row[0] == simulant.index[-1]:
+        if row[1].to_dict() != curr['tx'].to_dict() or row[0] == simulant.index[-1]:
             curr['end'] = row[0]
             for drug, dosage, s in zip(HYPERTENSION_DRUGS, DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS):
                 dose = curr['tx'][dosage]
@@ -239,9 +239,11 @@ def plot_dead(simulant):
 
 def plot_treatments(tx_changes, style='line'):
     if style == 'line':
+        offsets = {d: 0.01 * i for i, d in enumerate(HYPERTENSION_DRUGS)}
+
         for drug in tx_changes.drug.unique():
             df = tx_changes.loc[tx_changes.drug == drug]
-            plt.plot(df.start, df.dose, label=drug, drawstyle='steps-post')
+            plt.plot(df.start, df.dose + offsets[drug], label=drug, drawstyle='steps-post')
 
         in_single = tx_changes.loc[tx_changes.in_single_pill == 1]
         plt.scatter(in_single.start, in_single.dose, marker='^', s=200, label='in single pill',
@@ -256,29 +258,36 @@ def plot_treatments(tx_changes, style='line'):
         plt.legend()
         plt.show()
     elif style == 'bar':
-        # FIXME: haven't come up with a clever way to show which drugs are in a single pill yet - I wanted to hatch
-        #  those bars but you can't hatch just some bars easily
-        barwidth = 0.1
-
-        drug_colors = ['red', 'blue', 'green', 'yellow', 'purple']
+        drug_colors = ['red', 'blue', 'green', 'pink', 'purple']
 
         num_changes = len(tx_changes.start.unique())
         base_positions = np.arange(num_changes)
+
+        barwidth = 0.2
+        plt.xlim(0, len(base_positions))
 
         for i, drug in enumerate(HYPERTENSION_DRUGS):
             group = tx_changes.loc[tx_changes.drug == drug].sort_values('start')
             positions = [x + barwidth * i for x in base_positions]
             color = drug_colors[i]
-            heights = group.dose
+            group['bar_heights'] = group.dose
 
-            plt.bar(positions, heights, width=barwidth, color=color, edgecolor='white', label=drug)
+            if sum(group.dose) > 0:
+                plt.bar(positions, group.bar_heights, width=barwidth,
+                        color=color, edgecolor='white', label=drug, align='edge')
+
+            hatch_mask = group.in_single_pill == 1
+            if np.any(hatch_mask):
+                group.loc[~hatch_mask, 'bar_heights'] = 0
+                plt.bar(positions, group.bar_heights, width=barwidth, color=color, edgecolor='white',
+                        label=f'{drug}, in single pill', hatch='x', align='edge')
 
         for i in range(num_changes):
             plt.axvline(base_positions[i] + (len(HYPERTENSION_DRUGS)) * barwidth, color='black',
                         linewidth=4, linestyle='dashed')
 
         plt.xlabel('date', fontweight='bold')
-        plt.xticks([r + barwidth for r in range(len(HYPERTENSION_DRUGS))],
+        plt.xticks([r + 0.5 for r in range(num_changes)],
                    sorted([pd.Timestamp(d).strftime("%Y-%m-%d") for d in tx_changes.start.unique()]),
                    rotation=90)
         plt.yticks([0, 0.5, 1, 2], ['none', 'half', 'single', 'double'])
@@ -296,9 +305,11 @@ def plot_tx_changes_in_trajectory(simulant, min_sbp):
     baseline = min_sbp + OFFSETS['meds']
     tx_changes.dose = tx_changes.dose * DOSE_ADJUST + baseline
 
+    offsets = {d: 0.03*DOSE_ADJUST*i for i,d in enumerate(HYPERTENSION_DRUGS)}
+
     for drug in tx_changes.drug.unique():
         df = tx_changes.loc[tx_changes.drug == drug]
-        plt.plot(df.start, df.dose, label=drug, drawstyle='steps-post')
+        plt.plot(df.start, df.dose + offsets[drug], label=drug, drawstyle='steps-post')
 
     in_single = tx_changes.loc[tx_changes.in_single_pill == 1]
     plt.scatter(in_single.start, in_single.dose, marker='^', s=200, label='in single pill',
