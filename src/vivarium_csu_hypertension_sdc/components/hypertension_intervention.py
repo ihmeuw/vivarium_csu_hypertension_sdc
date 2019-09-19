@@ -277,11 +277,7 @@ class TreatmentAlgorithm:
 
         # not currently on any tx
         if sum(no_current_tx_mask):
-            new_meds = self.choose_half_dose_new_single_pill(index[no_current_tx_mask])
-
-            assert np.all(new_meds.loc[no_current_tx_mask, SINGLE_PILL_COLUMNS].sum(axis=1) == 2)
-            current_meds.loc[no_current_tx_mask] = new_meds
-            assert np.all(current_meds.loc[no_current_tx_mask, SINGLE_PILL_COLUMNS].sum(axis=1) == 2)
+            current_meds.loc[no_current_tx_mask] = self.choose_half_dose_new_single_pill(index[no_current_tx_mask])
 
         num_drugs = current_meds[DOSAGE_COLUMNS].mask(current_meds[DOSAGE_COLUMNS] > 0, 1).sum(axis=1).loc[~no_current_tx_mask]
 
@@ -289,9 +285,6 @@ class TreatmentAlgorithm:
             idx = index[num_drugs == n]
             if not idx.empty:
                 current_meds.loc[idx] = self.transition_fdc_by_num_current_drugs(idx, n, current_meds.loc[idx])
-        assert np.all(np.logical_not(current_meds.isna()))
-        assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
-        assert np.all(current_meds[SINGLE_PILL_COLUMNS].max(axis=1) <= 1)
 
         return current_meds
 
@@ -304,8 +297,6 @@ class TreatmentAlgorithm:
             current_meds.loc[:, DOSAGE_COLUMNS] = current_meds.mask(on_meds_mask, 0.5)  # switch to half dose of 2 drugs
             on_meds_mask = on_meds_mask.rename(columns={d: d.replace('dosage', 'in_single_pill') for d in on_meds_mask})
             current_meds.loc[:, SINGLE_PILL_COLUMNS] = current_meds.loc[:, SINGLE_PILL_COLUMNS].mask(on_meds_mask, 1)
-            assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
-            assert np.all(np.logical_not(current_meds.isna()))
 
         elif num_current_drugs == 2:
             non_zero_dosages = current_meds.loc[:, DOSAGE_COLUMNS].mask(current_meds.loc[:, DOSAGE_COLUMNS] == 0, np.nan)
@@ -319,8 +310,6 @@ class TreatmentAlgorithm:
             mins = np.tile(min_dosages.loc[~single_pill_eligible], (len(DOSAGE_COLUMNS), 1)).transpose()
             min_dosage_mask = np.equal(dosages, mins)
             current_meds.loc[index[~single_pill_eligible], DOSAGE_COLUMNS] *= (min_dosage_mask.astype(int) * 2)
-            assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
-            assert np.all(np.logical_not(current_meds.isna()))
 
             already_in_single = current_meds.loc[:, SINGLE_PILL_COLUMNS].sum(axis=1) > 0
 
@@ -336,21 +325,14 @@ class TreatmentAlgorithm:
                                                                   .rename(columns={d: d.replace('dosage',
                                                                                                 'in_single_pill')
                                                                                    for d in dosages}))
-            assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
-            assert np.all(np.logical_not(current_meds.isna()))
-
             # double dosage of single pill where possible
             mask = single_pill_eligible & already_in_single & (max_dosages < max(HYPERTENSION_DOSAGES))
             current_meds.loc[index[mask], DOSAGE_COLUMNS] *= 2
-            assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
-            assert np.all(np.logical_not(current_meds.isna()))
 
             # add 1/2 of new drug where already at max dosage of single pill
             mask = single_pill_eligible & already_in_single & (max_dosages == max(HYPERTENSION_DOSAGES))
             current_meds.loc[index[mask], DOSAGE_COLUMNS] += (
                 self.choose_half_dose_new_drug(index[mask], current_meds.loc[index[mask], DOSAGE_COLUMNS]))
-            assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
-            assert np.all(np.logical_not(current_meds.isna()))
 
         else:  # 3 drugs
             on_single_pill = current_meds.loc[:, SINGLE_PILL_COLUMNS].sum(axis=1) > 0
@@ -365,15 +347,10 @@ class TreatmentAlgorithm:
             mask = on_single_pill & double_single_possible
             current_meds.loc[index[mask], DOSAGE_COLUMNS] += single_pill_dosages.loc[index[mask]]
 
-            assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
-            assert np.all(np.logical_not(current_meds.isna()))
-
             # double dosage of drug not in single pill where single pill is already at max dosage
             mask = on_single_pill & ~double_single_possible
             current_meds.loc[index[mask], DOSAGE_COLUMNS] += (current_meds.loc[index[mask], DOSAGE_COLUMNS]
                                                               .mask(single_pill_dosage_mask.loc[index[mask]], 0))
-            assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
-            assert np.all(np.logical_not(current_meds.isna()))
 
             # if any 2+ drugs have equal dosages, put 2 of those on a single pill
             non_zero_dosages = current_meds.loc[~on_single_pill, DOSAGE_COLUMNS].mask(
@@ -396,8 +373,6 @@ class TreatmentAlgorithm:
             current_meds.loc[idx, SINGLE_PILL_COLUMNS] = (np.logical_not(lowest_mask).astype(int)
                                                           .rename(columns={d: d.replace('dosage', 'in_single_pill')
                                                                            for d in DOSAGE_COLUMNS}))
-            assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
-            assert np.all(np.logical_not(current_meds.isna()))
 
             # if 2+ have equal dosages, choose 2 and put them in a single pill
             idx = index[~on_single_pill][two_equal]
@@ -416,6 +391,5 @@ class TreatmentAlgorithm:
                                                             .astype(int))
 
             current_meds.loc[idx, SINGLE_PILL_COLUMNS] = put_in_single_pill
-            assert np.all(current_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
-            assert np.all(np.logical_not(current_meds.isna()))
+
         return current_meds
