@@ -3,15 +3,15 @@ components:
         population:
             - BasePopulation()
             - Mortality()
-        risks:
-            - Risk("risk_factor.high_systolic_blood_pressure")
+        #risks:
+        #    - Risk("risk_factor.high_systolic_blood_pressure")
 
         #metrics:
         #    - DisabilityObserver()
         #    - MortalityObserver()
 
     vivarium_csu_hypertension_sdc.components:
-        #- DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '130', '200')
+        - DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '135', '150')
         - BaselineCoverage()
         - TreatmentEffect()
         - TreatmentAlgorithm()
