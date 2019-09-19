@@ -1,5 +1,6 @@
 from scipy import stats
 
+from itertools import combinations
 import numpy as np
 import pandas as pd
 
@@ -259,11 +260,7 @@ class TreatmentAlgorithm:
         return current_meds
 
     def choose_half_dose_new_single_pill(self, index):
-        options = pd.DataFrame({'ace_inhibitors': [1, 0, 0],
-                                'calcium_channel_blockers': [0, 1, 1],
-                                'thiazide_type_diuretics': [1, 0, 1],
-                                'angiotensin_ii_blockers': [0, 1, 0]}, columns=HYPERTENSION_DRUGS).fillna(0)
-
+        options = utilities.get_all_legal_drug_combos(2)
         options = pd.concat([options.rename(columns={d: f'{d}_dosage' for d in options}) / 2,  # half dose
                              options.rename(columns={d: f'{d}_in_single_pill' for d in options})], axis=1)  # in single pill
 

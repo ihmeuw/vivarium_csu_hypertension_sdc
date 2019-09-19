@@ -187,3 +187,11 @@ def get_therapeutic_inertia_probability(mean, sd, randomness):
     return dist.ppf(draw)
 
 
+def get_all_legal_drug_combos(num_drugs):
+    options = pd.DataFrame(columns=HYPERTENSION_DRUGS)
+
+    for c in combinations(HYPERTENSION_DRUGS, num_drugs):
+        if not ILLEGAL_DRUG_COMBINATION.issubset(c):
+            options = options.append({d: 1 for d in c}, ignore_index=True)
+
+    return options.fillna(0)
