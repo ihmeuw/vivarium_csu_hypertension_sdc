@@ -3,26 +3,25 @@ components:
         population:
             - BasePopulation()
             - Mortality()
-        risks:
-            - Risk("risk_factor.high_systolic_blood_pressure")
+        #risks:
+        #    - Risk("risk_factor.high_systolic_blood_pressure")
 
         #metrics:
         #    - DisabilityObserver()
         #    - MortalityObserver()
 
     vivarium_csu_hypertension_sdc.components:
-        - IschemicHeartDisease()
-        #- DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '135', '150')
-        #- BaselineCoverage()
-        #- TreatmentEffect()
-        #- TreatmentAlgorithm()
-        #- SimulantTrajectoryObserver()
+        - DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '135', '150')
+        - BaselineCoverage()
+        - TreatmentEffect()
+        - TreatmentAlgorithm()
+        - SimulantTrajectoryObserver()
 
 configuration:
     input_data:
         location: China
         input_draw_number: 0
-        artifact_path: /home/collijk/China.hdf #/share/costeffectiveness/artifacts/vivarium_csu_hypertension_sdc/test.hdf
+        artifact_path: /home/kate/vivarium_artifacts/vivarium_csu_hypertension_sdc/test.hdf #/share/costeffectiveness/artifacts/vivarium_csu_hypertension_sdc/test.hdf
     interpolation:
         order: 0
         extrapolate: True
@@ -39,7 +38,7 @@ configuration:
             year: 2030
             month: 7
             day: 2
-        step_size: 28 # Days
+        step_size: 30 # Days
     population:
         population_size: 10_000
         age_start: 30
@@ -54,18 +53,18 @@ configuration:
             by_age: False
             by_sex: False
             by_year: False
-#        sample_history_observer:
-#            sample_size: 1_000
-#            path: /home/kate/vivarium_results/vivarium_csu_hypertension_sdc/test_sample_history.hdf
-#
-#    hypertension_treatment:
-#        high_systolic_blood_pressure_measurement:
-#            error_sd: 6
-#        therapeutic_inertia:
-#            mean: 0.136
-#            sd: 0.0136
-#        adverse_events:
-#            mean: 0.1373333333
-#            sd: 0.03069563849
-#        followup_visit_interval: 90  # days
-#        treatment_ramp: fixed_dose_combination
+        sample_history_observer:
+            sample_size: 1_000
+            path: /home/kate/vivarium_results/vivarium_csu_hypertension_sdc/test_sample_history.hdf
+
+    hypertension_treatment:
+        high_systolic_blood_pressure_measurement:
+            error_sd: 6
+        therapeutic_inertia:
+            mean: 0.136
+            sd: 0.0136
+        adverse_events:
+            mean: 0.1373333333
+            sd: 0.03069563849
+        followup_visit_interval: 90  # days
+        treatment_ramp: fixed_dose_combination

@@ -8,10 +8,11 @@ class RelapseTransition(RateTransition):
     def load_transition_rate_data(self, builder):
         if 'relapse_rate' in self._get_data_functions:
             rate_data = self._get_data_functions['relapse_rate'](self.output_state.cause, builder)
-            pipeline_name = f'{self.output_state.state_id}.incidence_rate'
+            pipeline_name = f'{self.output_state.state_id}.relapse_rate'
         else:
             raise ValueError("No valid data functions supplied.")
         return rate_data, pipeline_name
+
 
 class RelapseState(DiseaseState):
 
@@ -21,7 +22,7 @@ class RelapseState(DiseaseState):
 
     def setup(self, builder):
         super().setup(builder)
-        builder.event.register_listener('time_step_prepare', self.on_time_step_prepare)
+        builder.event.register_listener('time_step__prepare', self.on_time_step_prepare)
 
     def on_time_step_prepare(self, event):
         population = self.population_view.get(event.index, query='alive == "alive"')
@@ -58,10 +59,9 @@ def IschemicHeartDisease():
     acute_mi = DiseaseState('acute_myocardial_infarction',
                             cause_type='sequela',
                             get_data_functions=data_funcs)
-    data_funcs = {'dwell_time': lambda *args: pd.Timedelta(days=365.25)}
+    #data_funcs = {'dwell_time': lambda *args: pd.Timedelta(days=365.25)}
     post_mi = RelapseState('post_myocardial_infarction',
-                           cause_type='sequela',
-                           get_data_functions=data_funcs)
+                           cause_type='sequela',)
 
     susceptible.allow_self_transitions()
     data_funcs = {
@@ -77,7 +77,7 @@ def IschemicHeartDisease():
         'relapse_rate': lambda _, builder: builder.data.load('cause.ischemic_heart_disease.incidence_rate')
     }
     post_mi.add_transition(acute_mi, source_data_type='rate', get_data_functions=data_funcs)
-    post_mi.add_transition(susceptible, source_data_type='time')
+    #post_mi.add_transition(susceptible, source_data_type='time')
 
     return DiseaseModel('ischemic_heart_disease', states=[susceptible, acute_mi, post_mi])
 
@@ -92,10 +92,9 @@ def Stroke(stroke_name):
     acute = DiseaseState(f'acute_{stroke_name}',
                          cause_type='sequela',
                          get_data_functions=data_funcs)
-    data_funcs = {'dwell_time': lambda *args: pd.Timedelta(days=365.25)}
+    #data_funcs = {'dwell_time': lambda *args: pd.Timedelta(days=365.25)}
     post = RelapseState(f'post_{stroke_name}',
-                        cause_type='sequela',
-                        get_data_functions=data_funcs)
+                        cause_type='sequela')
 
     susceptible.allow_self_transitions()
     data_funcs = {
@@ -111,7 +110,7 @@ def Stroke(stroke_name):
         'relapse_rate': lambda _, builder: builder.data.load(f'cause.{stroke_name}.incidence_rate')
     }
     post.add_transition(acute, source_data_type='rate', get_data_functions=data_funcs)
-    post.add_transition(susceptible, source_data_type='time')
+    #post.add_transition(susceptible, source_data_type='time')
 
     return DiseaseModel(stroke_name, states=[susceptible, acute, post])
 
