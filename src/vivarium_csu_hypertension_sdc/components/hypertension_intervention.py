@@ -386,9 +386,12 @@ class TreatmentAlgorithm:
             # FIXME: we probably actually want to choose 2 at random but that's hard so just choosing first 2 for now
             for c in put_in_single_pill:
                 still_needs_drug = put_in_single_pill.sum(axis=1) < 2
+                # for everyone who doesn't have 2 drugs to put into a single pill, add the current drug if it's dosage
+                # is the dosage that 2+ drugs share
                 put_in_single_pill.loc[still_needs_drug, c] = ((dosages.loc[still_needs_drug,
-                                                                         c.replace('in_single_pill', 'dosage')] == equal_dosage.loc[still_needs_drug])
-                                                            .astype(int))
+                                                                            c.replace('in_single_pill', 'dosage')]
+                                                                == equal_dosage.loc[still_needs_drug])
+                                                               .astype(int))
 
             current_meds.loc[idx, SINGLE_PILL_COLUMNS] = put_in_single_pill
 
