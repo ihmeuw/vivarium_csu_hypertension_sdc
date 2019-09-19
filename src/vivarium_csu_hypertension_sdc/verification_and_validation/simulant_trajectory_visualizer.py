@@ -287,7 +287,7 @@ def plot_treatments(tx_changes, style='line'):
                         linewidth=4, linestyle='dashed')
 
         plt.xlabel('date', fontweight='bold')
-        plt.xticks([r for r in range(num_changes)],
+        plt.xticks([r + 0.5 for r in range(num_changes)],
                    sorted([pd.Timestamp(d).strftime("%Y-%m-%d") for d in tx_changes.start.unique()]),
                    rotation=90)
         plt.yticks([0, 0.5, 1, 2], ['none', 'half', 'single', 'double'])
