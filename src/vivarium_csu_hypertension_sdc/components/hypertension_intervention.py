@@ -75,6 +75,10 @@ class TreatmentAlgorithm:
 
         builder.event.register_listener('time_step', self.on_time_step)
 
+        transition_funcs = {'low_and_slow': self.transition_low_and_slow,
+                            'fixed_dose_combination': self.transition_fdc}
+        self._transition_func = transition_funcs[self.config.treatment_ramp]
+
     def on_initialize_simulants(self, pop_data):
         drug_dosages = self.population_view.subview(DOSAGE_COLUMNS).get(pop_data.index)
         sims_on_tx = drug_dosages.loc[drug_dosages.sum(axis=1) > 0].index
@@ -158,10 +162,7 @@ class TreatmentAlgorithm:
         return sbp_measurement
 
     def transition_treatment(self, index):
-        if self.config.treatment_ramp == "low_and_slow":
-            new_meds = self.transition_low_and_slow(index)
-        elif self.config.treatment_ramp == 'fixed_dose_combination':
-            new_meds = self.transition_fdc(index)
+        new_meds = self._transition_func(index)
         self.population_view.update(new_meds)
 
     def check_treatment_increase_possible(self, index):
