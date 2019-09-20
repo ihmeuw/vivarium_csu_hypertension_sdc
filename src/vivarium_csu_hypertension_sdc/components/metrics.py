@@ -271,7 +271,7 @@ class SBPTimeSeriesObserver:
 
     @property
     def name(self):
-        'sbp_time_series_observer'
+        return 'sbp_time_series_observer'
 
     def setup(self, builder):
         self.sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
