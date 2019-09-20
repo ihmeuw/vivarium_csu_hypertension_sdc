@@ -18,7 +18,8 @@ from vivarium_csu_hypertension_sdc.external_data.proportion_hypertensive import 
 
 
 def build_artifact(path, location):
-    artifact = create_new_artifact(path / f'{location}.hdf', location)
+    sanitized_location = location.lower().replace(" ", "_").replace("'", "-")
+    artifact = create_new_artifact(path / f'{sanitized_location}.hdf', location)
 
     write_demographic_data(artifact, location)
 
@@ -70,7 +71,6 @@ def write_ihd_data(artifact, location):
     # Measures for Disease Model
     key = 'cause.ischemic_heart_disease.cause_specific_mortality_rate'
     write(artifact, key, load(key))
-
 
     # Measures for Disease States
     mi = ['acute_myocardial_infarction_first_2_days', 'acute_myocardial_infarction_3_to_28_days']
@@ -149,7 +149,8 @@ def write_ckd_data(artifact, location):
     # TODO: Find source for YLDs at the draw level to back calc disability weight.
 
     key = 'cause.chronic_kidney_disease.excess_mortality_rate'
-    write(artifact, key, csmr/prevalence)
+    emr = (csmr / prevalence).fillna(0).replace([np.inf, -np.inf], 0)
+    write(artifact, key, emr)
 
     # Measures for Transitions
     key = 'cause.chronic_kidney_disease.incidence_rate'
