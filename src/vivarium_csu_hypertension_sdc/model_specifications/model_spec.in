@@ -5,7 +5,6 @@ components:
             - Mortality()
         risks:
             - Risk("risk_factor.high_systolic_blood_pressure")
-
         metrics:
             - DisabilityObserver()
             - MortalityObserver()
@@ -26,19 +25,19 @@ components:
         - BaselineCoverage()
         - TreatmentEffect()
         - TreatmentAlgorithm()
-        - SimulantTrajectoryObserver()
+        #- SimulantTrajectoryObserver()
 
 configuration:
     input_data:
-        location: China
+        location: {{ location_proper }}
         input_draw_number: 0
-        artifact_path: /home/collijk/china.hdf
+        artifact_path: /share/costeffectiveness/artifacts/vivarium_csu_hypertension_sdc/{{ location_sanitized }}.hdf
     interpolation:
         order: 0
         extrapolate: True
     randomness:
         map_size: 1_000_000
-        key_columns: ['entrance_time']
+        key_columns: ['entrance_time', 'age']
         random_seed: 0
     time:
         start:
@@ -46,24 +45,24 @@ configuration:
             month: 7
             day: 2
         end:
-            year: 2022
+            year: 2025
             month: 7
             day: 2
         step_size: 28 # Days
     population:
-        population_size: 10_000
+        population_size: 10000
         age_start: 30
         age_end: 125
 
     metrics:
         disability:
-            by_age: True
-            by_sex: True
-            by_year: True
+            by_age: False
+            by_sex: False
+            by_year: False
         mortality:
-            by_age: True
-            by_sex: True
-            by_year: True
+            by_age: False
+            by_sex: False
+            by_year: False
 
     hypertension_treatment:
         high_systolic_blood_pressure_measurement:
