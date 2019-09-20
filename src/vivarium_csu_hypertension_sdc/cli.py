@@ -1,7 +1,7 @@
 from collections import namedtuple
 from pathlib import Path
 import re
-from typing import List, Optional, Generator
+from typing import List, Optional, Iterable
 
 import click
 from jinja2 import Template
@@ -22,7 +22,7 @@ def build_htn_artifact(location):
     main(output_root, location)
 
 
-MODEL_SPEC_DIR = (Path(__file__).parent.parent / 'model_specifications').resolve()
+MODEL_SPEC_DIR = (Path(__file__).parent / 'model_specifications').resolve()
 @click.command()
 @click.option('-l', '--locations-file',
               type=click.Path(dir_okay=False),
@@ -75,7 +75,7 @@ def make_specs(template: str, locations_file: str, single_location: str, output_
                 location_sanitized=location.sanitized))
 
 
-def sanitize(*locations: str) -> Generator[Location]:
+def sanitize(*locations: str) -> Iterable[Location]:
     """Processes locations into tuples of proper and sanitized names.
 
     Sanitized location strings are all lower case, have spaces replaced
