@@ -159,6 +159,11 @@ def write_ckd_data(artifact, location):
 
 def write_sbp_data(artifact, location):
     load = get_load(location)
+    affected_entity_map = {'ischemic_heart_disease': 'acute_myocardial_infarction',
+                           'ischemic_stroke': 'acute_ischemic_stroke',
+                           'intracerebral_hemorrhage': 'acute_intracerebral_hemorrhage',
+                           'subarachnoid_hemorrhage': 'acute_subarachnoid_hemorrhage',
+                           'chronic_kidney_disease': 'chronic_kidney_disease'}
 
     prefix = 'risk_factor.high_systolic_blood_pressure.'
     measures = ["restrictions", "distribution", "tmred", "exposure", "exposure_standard_deviation",
@@ -181,7 +186,8 @@ def write_sbp_data(artifact, location):
             .apply(utilities.normalize, fill_value=0)
             .reset_index(drop=True)
     )
-    import pdb; pdb.set_trace()
+    data = data.loc[data.affected_entity.isin(affected_entity_map.keys())]
+    data.affected_entity.replace(to_replace=affected_entity_map, inplace=True)
     data = data.filter(globals.DEMOGRAPHIC_COLUMNS + ['affected_entity', 'affected_measure'] + globals.DRAW_COLUMNS)
     data = utilities.reshape(data)
     data = utilities.scrub_gbd_conventions(data, location)
@@ -199,9 +205,10 @@ def write_sbp_data(artifact, location):
     data.loc[morbidity & mortality, 'affected_measure'] = 'incidence_rate'
     data.loc[morbidity & ~mortality, 'affected_measure'] = 'incidence_rate'
     data.loc[~morbidity & mortality, 'affected_measure'] = 'excess_mortality'
-    affected_causes = ['ischemic_heart_disease', 'ischemic_stroke', 'subarachnoid_hemorrhage', 'intracerebral_hemorrhage']
-    data = data.loc[data.affected_entity.isin(affected_causes)]
+
+    data = data.loc[data.affected_entity.isin(affected_entity_map.keys())]
     data = core.filter_relative_risk_to_cause_restrictions(data)
+    data.affected_entity.replace(to_replace=affected_entity_map, inplace=True)
     data = data.filter(globals.DEMOGRAPHIC_COLUMNS +
                        ['affected_entity', 'affected_measure', 'parameter'] + globals.DRAW_COLUMNS)
     data = (
