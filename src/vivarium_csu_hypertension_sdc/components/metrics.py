@@ -185,20 +185,20 @@ class HtnMortalityObserver(MortalityObserver):
             raise ValueError('This custom mortality observer cannot be stratified by year.')
 
         self.step_size = pd.Timedelta(builder.configuration.time.step_size)
-        self.tx_pop_view = builder.population.get_view(DOSAGE_COLUMNS)
+        self.tx_pop_view = builder.population.get_view(DOSAGE_COLUMNS + ['alive'])
         self.sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
         self.pdc = builder.value.get_value('hypertension_meds.pdc')
 
         self.person_time = Counter()
 
-        builder.value.register_listener('time_step__prepare', self.on_time_step_prepare)
+        builder.event.register_listener('time_step__prepare', self.on_time_step_prepare)
 
     def on_time_step_prepare(self, event):
         # I think this is right timing wise - I didn't want to do on collect metrics b/c if someone gets on tx during
         # a time step, it doesn't seem like their person time should be counted in the treated status
         base_filter = QueryString("")
 
-        for key, index in self.get_groups(event.index):
+        for key, index in self.get_groups(event.index).items():
             pop = self.population_view.get(index)
             lived_in_span = get_lived_in_span(pop, event.time, event.time + self.step_size)
             span_key = get_output_template(**self.config.to_dict()).substitute(measure=f'person_time_{key}')
@@ -211,7 +211,7 @@ class HtnMortalityObserver(MortalityObserver):
 
         groups = {}
 
-        treated = pop.sum(axis=1) > 0
+        treated = pop[DOSAGE_COLUMNS].sum(axis=1) > 0
         groups['among_not_treated'] = pop.index[~treated]
         groups['among_treated'] = pop.index[treated]
 

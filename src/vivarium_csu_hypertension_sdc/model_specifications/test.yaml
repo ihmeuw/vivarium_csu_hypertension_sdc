@@ -17,6 +17,7 @@ components:
         - TreatmentAlgorithm()
         - SimulantTrajectoryObserver()
         #- MedicationObserver()
+        - HtnMortalityObserver()
 
 configuration:
     input_data:
@@ -51,8 +52,8 @@ configuration:
             by_sex: False
             by_year: False
         mortality:
-            by_age: False
-            by_sex: False
+            by_age: True
+            by_sex: True
             by_year: False
         sample_history_observer:
             sample_size: 1_000
