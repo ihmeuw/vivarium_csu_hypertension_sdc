@@ -184,7 +184,7 @@ class HtnMortalityObserver(MortalityObserver):
         if self.config.by_year:
             raise ValueError('This custom mortality observer cannot be stratified by year.')
 
-        self.step_size = pd.Timedelta(builder.configuration.time.step_size)
+        self.step_size = pd.Timedelta(days=builder.configuration.time.step_size)
         self.tx_pop_view = builder.population.get_view(DOSAGE_COLUMNS + ['alive'])
         self.sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
         self.pdc = builder.value.get_value('hypertension_meds.pdc')
@@ -200,7 +200,12 @@ class HtnMortalityObserver(MortalityObserver):
 
         for key, index in self.get_groups(event.index).items():
             pop = self.population_view.get(index)
-            lived_in_span = get_lived_in_span(pop, event.time, event.time + self.step_size)
+            pop.loc[pop.exit_time.isna(), 'exit_time'] = self.clock() + self.step_size
+
+            t_start = self.clock()
+            t_end = self.clock() + self.step_size
+            lived_in_span = get_lived_in_span(pop, t_start, t_end)
+
             span_key = get_output_template(**self.config.to_dict()).substitute(measure=f'person_time_{key}')
             person_time_in_span = get_person_time_in_span(lived_in_span, base_filter, span_key, self.config.to_dict(),
                                                           self.age_bins)
