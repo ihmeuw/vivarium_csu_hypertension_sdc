@@ -2,10 +2,13 @@ from collections import Counter
 
 import pandas as pd
 
-from vivarium_public_health.metrics.utilities import (get_output_template, QueryString, get_age_bins,
-                                                      get_age_sex_filter_and_iterables)
-from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS, HYPERTENSION_DRUGS)
-
+from vivarium_public_health.metrics import MortalityObserver
+from vivarium_public_health.metrics.utilities import (get_output_template, get_age_bins, QueryString,
+                                                      get_age_sex_filter_and_iterables, get_deaths,
+                                                      get_years_of_life_lost, get_lived_in_span,
+                                                      get_person_time_in_span)
+from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS, HYPERTENSION_DRUGS,
+                                                              MIN_PDC_FOR_ADHERENT)
 
 class SimulantTrajectoryObserver:
 
@@ -172,3 +175,85 @@ class MedicationObserver:
 
     def __repr__(self):
         return 'MedicationObserver()'
+
+
+class HtnMortalityObserver(MortalityObserver):
+    def setup(self, builder):
+        super().setup(builder)
+
+        if self.config.by_year:
+            raise ValueError('This custom mortality observer cannot be stratified by year.')
+
+        self.step_size = pd.Timedelta(builder.configuration.time.step_size)
+        self.tx_pop_view = builder.population.get_view(DOSAGE_COLUMNS)
+        self.sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
+        self.pdc = builder.value.get_value('hypertension_meds.pdc')
+
+        self.person_time = Counter()
+
+        builder.value.register_listener('time_step__prepare', self.on_time_step_prepare)
+
+    def on_time_step_prepare(self, event):
+        # I think this is right timing wise - I didn't want to do on collect metrics b/c if someone gets on tx during
+        # a time step, it doesn't seem like their person time should be counted in the treated status
+        base_filter = QueryString("")
+
+        for key, index in self.get_groups(event.index):
+            pop = self.population_view.get(index)
+            lived_in_span = get_lived_in_span(pop, event.time, event.time + self.step_size)
+            span_key = get_output_template(**self.config.to_dict()).substitute(measure=f'person_time_{key}')
+            person_time_in_span = get_person_time_in_span(lived_in_span, base_filter, span_key, self.config.to_dict(),
+                                                          self.age_bins)
+            self.person_time.update(person_time_in_span)
+
+    def get_groups(self, index):
+        pop = self.tx_pop_view.get(index).query("alive == 'alive'")
+
+        groups = {}
+
+        treated = pop.sum(axis=1) > 0
+        groups['among_not_treated'] = pop.index[~treated]
+        groups['among_treated'] = pop.index[treated]
+
+        return self.get_adherence_groups(self.get_sbp_groups(groups, index), index)
+
+    def get_sbp_groups(self, groups, index):
+        sbp = self.sbp(index)
+        sbp_groups = {}
+        for k, idx in groups.items():
+            grp_sbp = sbp.loc[idx]
+
+            sbp_groups[f'{k}_sbp_group_<140'] = idx[grp_sbp < 140]
+            sbp_groups[f'{k}_sbp_group_140_to_160'] = idx[(140 <= grp_sbp) & (grp_sbp <= 160)]
+            sbp_groups[f'{k}_sbp_group_>160'] = idx[grp_sbp > 160]
+        return sbp_groups
+
+    def get_adherence_groups(self, groups, index):
+        pdc = self.pdc(index)
+        adherent_groups = {}
+        for k, idx in groups.items():
+            grp_pdc = pdc.loc[idx]
+
+            adherent_groups[f'{k}_among_adherent'] = idx[grp_pdc >= MIN_PDC_FOR_ADHERENT]
+            adherent_groups[f'{k}_among_adherent'] = idx[grp_pdc < MIN_PDC_FOR_ADHERENT]
+        return adherent_groups
+
+    def metrics(self, index, metrics):
+        pop = self.population_view.get(index)
+        pop.loc[pop.exit_time.isnull(), 'exit_time'] = self.clock()
+
+        deaths = get_deaths(pop, self.config.to_dict(), self.start_time, self.clock(), self.age_bins, self.causes)
+        ylls = get_years_of_life_lost(pop, self.config.to_dict(), self.start_time, self.clock(),
+                                      self.age_bins, self.life_expectancy, self.causes)
+
+        metrics.update(self.person_time)
+        metrics.update(deaths)
+        metrics.update(ylls)
+
+        the_living = pop[(pop.alive == 'alive') & pop.tracked]
+        the_dead = pop[pop.alive == 'dead']
+        metrics['years_of_life_lost'] = self.life_expectancy(the_dead.index).sum()
+        metrics['total_population_living'] = len(the_living)
+        metrics['total_population_dead'] = len(the_dead)
+
+        return metrics
