@@ -192,6 +192,9 @@ class HtnMortalityObserver(MortalityObserver):
         self.person_time = Counter()
 
         builder.event.register_listener('time_step__prepare', self.on_time_step_prepare)
+        # because we're collecting metrics on time step prepare for the previous time step, we need to do it once more
+        # at simulation end for the last time step in the simulation
+        builder.event.register_listener('simulation_end', self.on_time_step_prepare)
 
     def on_time_step_prepare(self, event):
         # I think this is right timing wise - I didn't want to do on collect metrics b/c if someone gets on tx during
