@@ -12,6 +12,17 @@ components:
 
     vivarium_csu_hypertension_sdc.components:
         - IschemicHeartDisease()
+        - Stroke('ischemic_stroke')
+        - Stroke('intracerebral_hemorrhage')
+        - Stroke('subarachnoid_hemorrhage')
+        - BetterRiskEffect('risk_factor.high_systolic_blood_pressure', 'sequela.acute_myocardial_infarction.incidence_rate')
+        - BetterRiskEffect('risk_factor.high_systolic_blood_pressure', 'sequela.acute_myocardial_infarction.relapse_rate')
+        - BetterRiskEffect('risk_factor.high_systolic_blood_pressure', 'sequela.acute_ischemic_stroke.incidence_rate')
+        - BetterRiskEffect('risk_factor.high_systolic_blood_pressure', 'sequela.acute_ischemic_stroke.relapse_rate')
+        - BetterRiskEffect('risk_factor.high_systolic_blood_pressure', 'sequela.acute_intracerebral_hemorrhage.incidence_rate')
+        - BetterRiskEffect('risk_factor.high_systolic_blood_pressure', 'sequela.acute_intracerebral_hemorrhage.relapse_rate')
+        - BetterRiskEffect('risk_factor.high_systolic_blood_pressure', 'sequela.acute_subarachnoid_hemorrhage.incidence_rate')
+        - BetterRiskEffect('risk_factor.high_systolic_blood_pressure', 'sequela.acute_subarachnoid_hemorrhage.relapse_rate')
         #- DummyContinuousRisk('risk_factor.high_systolic_blood_pressure', '135', '150')
         #- BaselineCoverage()
         #- TreatmentEffect()
