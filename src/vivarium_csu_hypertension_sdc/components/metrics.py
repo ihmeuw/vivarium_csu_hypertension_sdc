@@ -108,7 +108,6 @@ class MedicationObserver:
 
     def setup(self, builder):
         self.config = builder.configuration['metrics']['medication']
-        self.clock = builder.time.clock()
         self.counts = Counter()
 
         age_sex_filter, (self.ages, self.sexes) = get_age_sex_filter_and_iterables(self.config, get_age_bins(builder))

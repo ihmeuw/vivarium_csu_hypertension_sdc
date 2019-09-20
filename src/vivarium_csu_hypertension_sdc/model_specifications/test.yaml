@@ -16,7 +16,7 @@ components:
         - TreatmentEffect()
         - TreatmentAlgorithm()
         - SimulantTrajectoryObserver()
-        - MedicationObserver()
+        #- MedicationObserver()
 
 configuration:
     input_data:
