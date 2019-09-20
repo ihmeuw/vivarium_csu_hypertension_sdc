@@ -181,6 +181,7 @@ def write_sbp_data(artifact, location):
             .apply(utilities.normalize, fill_value=0)
             .reset_index(drop=True)
     )
+    import pdb; pdb.set_trace()
     data = data.filter(globals.DEMOGRAPHIC_COLUMNS + ['affected_entity', 'affected_measure'] + globals.DRAW_COLUMNS)
     data = utilities.reshape(data)
     data = utilities.scrub_gbd_conventions(data, location)
