@@ -184,8 +184,8 @@ class TreatmentAlgorithm:
         if self.config.treatment_ramp == 'low_and_slow':
             no_tx_increase_mask = dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)  # 3 drugs, each on a max dosage
         elif self.config.treatment_ramp == 'fixed_dose_combination':
-            # 3 drugs, each on a max dosage and 3 drugs in single pill
-            no_tx_increase_mask = (dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)) & (single_pill.sum(axis=1) >= 2)
+            # 3 drugs, each on a max dosage and all in single pill
+            no_tx_increase_mask = (dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)) & (single_pill.sum(axis=1) >= 3)
         else:  # free_choice
             single_pill_dr = self.population_view.subview(['single_pill_dr']).get(index).loc[:, 'single_pill_dr']
             # 3 drugs each on a max dosage

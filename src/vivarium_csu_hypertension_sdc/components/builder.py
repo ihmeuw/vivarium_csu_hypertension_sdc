@@ -18,7 +18,8 @@ from vivarium_csu_hypertension_sdc.external_data.proportion_hypertensive import 
 
 
 def build_artifact(path, location):
-    artifact = create_new_artifact(path, location)
+    sanitized_location = location.lower().replace(" ", "_").replace("'", "-")
+    artifact = create_new_artifact(path / f'{sanitized_location}.hdf', location)
 
     write_demographic_data(artifact, location)
 
@@ -26,6 +27,12 @@ def build_artifact(path, location):
     write_stroke_data(artifact, location, 'ischemic_stroke', 9310, 10837)
     write_stroke_data(artifact, location, 'subarachnoid_hemorrhage', 18731, 18733)
     write_stroke_data(artifact, location, 'intracerebral_hemorrhage', 9311, 10836)
+    write_ckd_data(artifact, location)
+    write_sbp_data(artifact, location)
+
+    write_proportion_hypertensive(artifact, location)
+    write_hypertension_medication_data(artifact, location)
+    write_utilization_rate(artifact, location)
 
 
 def build_treatment_artifact(path, location):
@@ -47,6 +54,9 @@ def write_demographic_data(artifact, location):
     for m in measures:
         key = prefix + m
         write(artifact, key, load(key))
+
+    key = 'cause.all_causes.cause_specific_mortality_rate'
+    write(artifact, key, load(key))
 
 
 def write_ihd_data(artifact, location):
@@ -89,7 +99,7 @@ def write_ihd_data(artifact, location):
     write(artifact, key, load(key))
 
 
-def write_stroke_data(artifact, stroke_name, location, acute_meid, post_meid):
+def write_stroke_data(artifact, location, stroke_name, acute_meid, post_meid):
     load = get_load(location)
 
     # Metadata
@@ -128,16 +138,19 @@ def write_ckd_data(artifact, location):
 
     # Measures for Disease Model
     key = f'cause.chronic_kidney_disease.cause_specific_mortality_rate'
-    write(artifact, key, load(key))
+    csmr = load(key)
+    write(artifact, key, csmr)
 
     # Measures for Disease States
     key = 'cause.chronic_kidney_disease.prevalence'
-    write(artifact, key, load(key))
+    prevalence = load(key)
+    write(artifact, key, prevalence)
 
     # TODO: Find source for YLDs at the draw level to back calc disability weight.
 
-    key = 'cause.chronic_kidney_disease.excesss_mortality_rate'
-    write(artifact, key, load(key))
+    key = 'cause.chronic_kidney_disease.excess_mortality_rate'
+    emr = (csmr / prevalence).fillna(0).replace([np.inf, -np.inf], 0)
+    write(artifact, key, emr)
 
     # Measures for Transitions
     key = 'cause.chronic_kidney_disease.incidence_rate'
@@ -169,12 +182,14 @@ def write_sbp_data(artifact, location):
             .reset_index(drop=True)
     )
     data = data.filter(globals.DEMOGRAPHIC_COLUMNS + ['affected_entity', 'affected_measure'] + globals.DRAW_COLUMNS)
+    data = utilities.reshape(data)
     data = utilities.scrub_gbd_conventions(data, location)
     data = utilities.sort_hierarchical_data(data)
 
+
     key = prefix + 'population_attributable_fraction'
     write(artifact, key, data)
-    ckd_paf = data[data.affected_entity == 'chronic_kidney_disease']
+    #ckd_paf = data[data.affected_entity == 'chronic_kidney_disease']
 
     data = gbd.get_relative_risk(sbp.gbd_id, utility_data.get_location_id(location))
     data = utilities.convert_affected_entity(data, 'cause_id')
@@ -183,6 +198,8 @@ def write_sbp_data(artifact, location):
     data.loc[morbidity & mortality, 'affected_measure'] = 'incidence_rate'
     data.loc[morbidity & ~mortality, 'affected_measure'] = 'incidence_rate'
     data.loc[~morbidity & mortality, 'affected_measure'] = 'excess_mortality'
+    affected_causes = ['ischemic_heart_disease', 'ischemic_stroke', 'subarachnoid_hemorrhage', 'intracerebral_hemorrhage']
+    data = data.loc[data.affected_entity.isin(affected_causes)]
     data = core.filter_relative_risk_to_cause_restrictions(data)
     data = data.filter(globals.DEMOGRAPHIC_COLUMNS +
                        ['affected_entity', 'affected_measure', 'parameter'] + globals.DRAW_COLUMNS)
@@ -192,15 +209,17 @@ def write_sbp_data(artifact, location):
             .apply(utilities.normalize, fill_value=1)
             .reset_index(drop=True)
     )
+    data = utilities.reshape(data)
     data = utilities.scrub_gbd_conventions(data, location)
     data = utilities.sort_hierarchical_data(data)
-    data = append_ckd_rr(data, ckd_paf)
+    #data = append_ckd_rr(data, ckd_paf)
 
     key = prefix + 'relative_risk'
     write(artifact, key, data)
 
 
 def write(artifact, key, data):
+
     data = split_interval(data, interval_column='age', split_column_prefix='age')
     data = split_interval(data, interval_column='year', split_column_prefix='year')
     artifact.write(key, data)
@@ -230,7 +249,7 @@ def create_new_artifact(path: str, location: str) -> Artifact:
 def load_em_from_meid(meid, location):
     location_id = utility_data.get_location_id(location)
     data = gbd.get_modelable_entity_draws(meid, location_id)
-    data = data[data.measure_id == globals.MEASURES['excess_mortality']]
+    data = data[data.measure_id == globals.MEASURES['Excess mortality rate']]
     data = utilities.normalize(data, fill_value=0)
     data = data.filter(globals.DEMOGRAPHIC_COLUMNS + globals.DRAW_COLUMNS)
     data = utilities.reshape(data)
