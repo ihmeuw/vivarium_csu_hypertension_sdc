@@ -265,3 +265,36 @@ class HtnMortalityObserver(MortalityObserver):
         metrics['total_population_dead'] = len(the_dead)
 
         return metrics
+
+
+class SBPTimeSeriesObserver:
+
+    @property
+    def name(self):
+        'sbp_time_series_observer'
+
+    def setup(self, builder):
+        self.sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
+        self.population_view = builder.population.get_view(DOSAGE_COLUMNS + ['alive'])
+
+        self.clock = builder.time.clock()
+
+        # observing on time step prepare (and then once more at end of sim) because want the blood pressure, tx status
+        # to be updated for the time step before checking
+        builder.event.register_listener('time_step__prepare', self.on_time_step_prepare)
+        builder.event.register_listener('simulation_end', self.on_time_step_prepare)
+        builder.value.register_value_modifier('metrics', self.metrics)
+
+        self.sbp_time_series = {}
+
+    def on_time_step_prepare(self, event):
+        pop = self.population_view.get(event.index).query("alive == 'alive'")
+        sbp = self.sbp(pop.index)
+
+        treated = pop[DOSAGE_COLUMNS].sum(axis=1) > 0
+        self.sbp_time_series[f'average_sbp_among_treated_at_{self.clock()}'] = sbp.loc[treated].mean()
+        self.sbp_time_series[f'average_sbp_among_untreated_at_{self.clock()}'] = sbp.loc[~treated].mean()
+
+    def metrics(self, index, metrics):
+        metrics.update(self.sbp_time_series)
+        return metrics
