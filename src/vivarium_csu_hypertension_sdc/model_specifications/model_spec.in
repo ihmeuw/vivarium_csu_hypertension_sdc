@@ -56,12 +56,12 @@ configuration:
 
     metrics:
         disability:
-            by_age: False
-            by_sex: False
+            by_age: True
+            by_sex: True
             by_year: False
         mortality:
-            by_age: False
-            by_sex: False
+            by_age: True
+            by_sex: True
             by_year: False
 
     hypertension_treatment:
