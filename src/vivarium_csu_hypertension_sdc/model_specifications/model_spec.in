@@ -7,7 +7,11 @@ components:
             - Risk("risk_factor.high_systolic_blood_pressure")
         metrics:
             - DisabilityObserver()
-            - MortalityObserver()
+            - DiseaseObserver("acute_myocardial_infarction")
+            - DiseaseObserver("post_myocardial_infarction")
+            - DiseaseObserver("ischemic_stroke")
+            - DiseaseObserver("subarachnoid_hemorrhage")
+            - DiseaseObserver("intracerebral_hemorrhage")
 
     vivarium_csu_hypertension_sdc.components:
         - IschemicHeartDisease()
@@ -26,6 +30,9 @@ components:
         - TreatmentEffect()
         - TreatmentAlgorithm()
         #- SimulantTrajectoryObserver()
+        - MedicationObserver()
+        - HtnMortalityObserver()
+        - SBPTimeSeriesObserver()
 
 configuration:
     input_data:
@@ -60,6 +67,30 @@ configuration:
             by_sex: True
             by_year: False
         mortality:
+            by_age: True
+            by_sex: True
+            by_year: False
+        medication:
+            by_age: True
+            by_sex: True
+            by_year: False
+        acute_myocardial_infarction_observer:
+            by_age: True
+            by_sex: True
+            by_year: False
+        post_myocardial_infarction_observer:
+            by_age: True
+            by_sex: True
+            by_year: False
+        ischemic_stroke_observer:
+            by_age: True
+            by_sex: True
+            by_year: False
+        subarchnoid_hemorrhage_observer:
+            by_age: True
+            by_sex: True
+            by_year: False
+        intracerebral_hemorrhage_observer:
             by_age: True
             by_sex: True
             by_year: False
