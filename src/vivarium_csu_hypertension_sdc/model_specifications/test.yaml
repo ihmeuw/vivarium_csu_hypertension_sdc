@@ -58,9 +58,9 @@ configuration:
             sample_size: 1_000
             path: /home/kate/vivarium_results/vivarium_csu_hypertension_sdc/test_sample_history.hdf
         medication:
-            by_age: False
-            by_sex: False
-            by_year: False
+            by_age: True
+            by_sex: True
+            by_year: True
 
     hypertension_treatment:
         high_systolic_blood_pressure_measurement:

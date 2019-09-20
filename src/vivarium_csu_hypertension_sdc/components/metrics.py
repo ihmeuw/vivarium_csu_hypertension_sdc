@@ -107,7 +107,7 @@ class MedicationObserver:
         return 'medication_observer'
 
     def setup(self, builder):
-        self.config = builder.configuration['metrics']['medication'].to_dict()
+        self.config = builder.configuration['metrics']['medication']
         self.clock = builder.time.clock()
         self.counts = Counter()
 
@@ -162,8 +162,8 @@ class MedicationObserver:
                 # number of times drug prescribed in single pill with 1 other drug and 2 other drugs
                 for n in [2, 3]:
                     key = group_key.substitute(measure=f'{drug}_prescribed_in_{n}_drug_single_pill_count')
-                    drug_counts[key] = in_group.loc[(in_group[f'{drug}_in_single_pill'])
-                                                    & (in_group['num_in_single_pill'] == n)]
+                    drug_counts[key] = sum((in_group[f'{drug}_in_single_pill'] == 1)
+                                           & (in_group['num_in_single_pill'] == n))
 
         return drug_counts
 
