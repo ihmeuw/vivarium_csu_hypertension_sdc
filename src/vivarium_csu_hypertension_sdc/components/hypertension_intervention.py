@@ -163,6 +163,7 @@ class TreatmentAlgorithm:
 
     def transition_treatment(self, index):
         new_meds = self._transition_func(index)
+        assert np.all(new_meds[DOSAGE_COLUMNS].max(axis=1) <= 2)
         self.population_view.update(new_meds)
 
     def check_treatment_increase_possible(self, index):
@@ -172,8 +173,8 @@ class TreatmentAlgorithm:
         if self.config.treatment_ramp == 'low_and_slow':
             no_tx_increase_mask = dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)  # 3 drugs, each on a max dosage
         elif self.config.treatment_ramp == 'fixed_dose_combination':
-            # 3 drugs, each on a max dosage and at least 2 drugs in single pill
-            no_tx_increase_mask = (dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)) & (single_pill.sum(axis=1) >= 2)
+            # 3 drugs, each on a max dosage and all in single pill
+            no_tx_increase_mask = (dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)) & (single_pill.sum(axis=1) >= 3)
 
         return index[~no_tx_increase_mask]
 
@@ -277,120 +278,67 @@ class TreatmentAlgorithm:
         if sum(no_current_tx_mask):
             current_meds.loc[no_current_tx_mask] = self.choose_half_dose_new_single_pill(index[no_current_tx_mask])
 
-        num_drugs = current_meds[DOSAGE_COLUMNS].mask(current_meds[DOSAGE_COLUMNS] > 0, 1).sum(axis=1).loc[~no_current_tx_mask]
+        num_drugs = current_meds[DOSAGE_COLUMNS].mask(current_meds[DOSAGE_COLUMNS] > 0, 1).sum(axis=1)
 
-        for n in num_drugs.unique():
-            idx = index[num_drugs == n]
-            if not idx.empty:
-                current_meds.loc[idx] = self.transition_fdc_by_num_current_drugs(idx, n, current_meds.loc[idx])
+        # currently on 1 drug
+        idx = index[~no_current_tx_mask & (num_drugs == 1)]
+        if not idx.empty:
+            current_meds.loc[idx] = self.transition_fdc_from_one_drug(idx, current_meds.loc[idx])
+
+        # currently on 2-3 drugs
+        idx = index[~no_current_tx_mask & (num_drugs > 1)]
+        if not idx.empty:
+            current_meds.loc[idx] = self.transition_fdc_from_multiple_drugs(idx, current_meds.loc[idx])
 
         return current_meds
 
-    def transition_fdc_by_num_current_drugs(self, index, num_current_drugs, current_meds):
-        if num_current_drugs == 1:
-            # switch to half dose single pill combo of current drug + one other
-            new_dose = self.choose_half_dose_new_drug(index, current_meds.loc[:, DOSAGE_COLUMNS])
-            current_meds.loc[:, DOSAGE_COLUMNS] += new_dose
-            on_meds_mask = current_meds.loc[:, DOSAGE_COLUMNS] > 0
-            current_meds.loc[:, DOSAGE_COLUMNS] = current_meds.mask(on_meds_mask, 0.5)  # switch to half dose of 2 drugs
-            on_meds_mask = on_meds_mask.rename(columns={d: d.replace('dosage', 'in_single_pill') for d in on_meds_mask})
-            current_meds.loc[:, SINGLE_PILL_COLUMNS] = current_meds.loc[:, SINGLE_PILL_COLUMNS].mask(on_meds_mask, 1)
+    def transition_fdc_from_one_drug(self, index, current_meds):
+        # switch to half dose single pill combo of current drug + one other
+        new_dose = self.choose_half_dose_new_drug(index, current_meds.loc[:, DOSAGE_COLUMNS])
+        current_meds.loc[:, DOSAGE_COLUMNS] += new_dose
+        on_meds_mask = current_meds.loc[:, DOSAGE_COLUMNS] > 0
+        current_meds.loc[:, DOSAGE_COLUMNS] = current_meds.mask(on_meds_mask, 0.5)  # switch to half dose of 2 drugs
+        on_meds_mask = on_meds_mask.rename(columns={d: d.replace('dosage', 'in_single_pill') for d in on_meds_mask})
+        current_meds.loc[:, SINGLE_PILL_COLUMNS] = current_meds.loc[:, SINGLE_PILL_COLUMNS].mask(on_meds_mask, 1)
+        return current_meds
 
-        elif num_current_drugs == 2:
-            non_zero_dosages = current_meds.loc[:, DOSAGE_COLUMNS].mask(current_meds.loc[:, DOSAGE_COLUMNS] == 0, np.nan)
-            min_dosages = non_zero_dosages.min(axis=1)
-            max_dosages = non_zero_dosages.max(axis=1)
+    def transition_fdc_from_multiple_drugs(self, index, current_meds):
+        non_zero_dosages = current_meds.loc[:, DOSAGE_COLUMNS].mask(current_meds.loc[:, DOSAGE_COLUMNS] == 0, np.nan)
+        min_dosages = non_zero_dosages.min(axis=1)
+        max_dosages = non_zero_dosages.max(axis=1)
 
-            single_pill_eligible = max_dosages / min_dosages <= 2
+        single_pill_eligible = max_dosages / min_dosages <= 2
 
-            # double dosage of lower-dose drug where single pill is not possible
-            dosages = current_meds.loc[~single_pill_eligible, DOSAGE_COLUMNS]
-            mins = np.tile(min_dosages.loc[~single_pill_eligible], (len(DOSAGE_COLUMNS), 1)).transpose()
-            min_dosage_mask = np.equal(dosages, mins)
-            current_meds.loc[index[~single_pill_eligible], DOSAGE_COLUMNS] *= (min_dosage_mask.astype(int) * 2)
+        # double dosage of lower-dose drug where single pill is not possible
+        dosages = current_meds.loc[~single_pill_eligible, DOSAGE_COLUMNS]
+        mins = np.tile(min_dosages.loc[~single_pill_eligible], (len(DOSAGE_COLUMNS), 1)).transpose()
+        min_dosage_mask = np.equal(dosages, mins)
+        current_meds.loc[index[~single_pill_eligible], DOSAGE_COLUMNS] += (dosages * min_dosage_mask.astype(int))
 
-            already_in_single = current_meds.loc[:, SINGLE_PILL_COLUMNS].sum(axis=1) > 0
+        num_in_single = current_meds.loc[:, SINGLE_PILL_COLUMNS].sum(axis=1)
+        num_drugs = current_meds[DOSAGE_COLUMNS].mask(current_meds[DOSAGE_COLUMNS] > 0, 1).sum(axis=1)
+        already_in_single = num_in_single == num_drugs
 
-            # put prescribed meds in single pill with highest currently prescribed dosage if not already in single pill
-            mask = single_pill_eligible & ~already_in_single
-            dosages = current_meds.loc[mask, DOSAGE_COLUMNS]
-            maxes = np.tile(max_dosages.loc[mask], (len(DOSAGE_COLUMNS), 1)).transpose()
-            max_dosage_mask = np.equal(dosages, maxes)
-            # set the dosage of the 2 currently prescribed meds to the highest prescribed dosage
-            current_meds.loc[index[mask], DOSAGE_COLUMNS] = max_dosage_mask.astype(int).multiply(maxes)
-            # and mark the 2 currently prescribed meds as being in a single pill
-            current_meds.loc[index[mask], SINGLE_PILL_COLUMNS] = (dosages.mask(dosages > 0, 1)
-                                                                  .rename(columns={d: d.replace('dosage',
-                                                                                                'in_single_pill')
-                                                                                   for d in dosages}))
-            # double dosage of single pill where possible
-            mask = single_pill_eligible & already_in_single & (max_dosages < max(HYPERTENSION_DOSAGES))
-            current_meds.loc[index[mask], DOSAGE_COLUMNS] *= 2
+        # put prescribed meds in single pill with highest currently prescribed dosage if not already in single pill
+        mask = single_pill_eligible & ~already_in_single
+        dosages = current_meds.loc[mask, DOSAGE_COLUMNS]
+        maxes = np.tile(max_dosages.loc[mask], (len(DOSAGE_COLUMNS), 1)).transpose()
 
-            # add 1/2 of new drug where already at max dosage of single pill
-            mask = single_pill_eligible & already_in_single & (max_dosages == max(HYPERTENSION_DOSAGES))
-            current_meds.loc[index[mask], DOSAGE_COLUMNS] += (
-                self.choose_half_dose_new_drug(index[mask], current_meds.loc[index[mask], DOSAGE_COLUMNS]))
+        # set the dosage of the currently prescribed meds to the highest prescribed dosage
+        currently_prescribed = dosages.mask(dosages > 0, 1)
+        current_meds.loc[index[mask], DOSAGE_COLUMNS] = currently_prescribed.multiply(maxes)
+        # and mark the currently prescribed meds as being in a single pill
+        current_meds.loc[index[mask], SINGLE_PILL_COLUMNS] = (currently_prescribed
+                                                              .rename(columns={d: d.replace('dosage',
+                                                                                            'in_single_pill')
+                                                                               for d in dosages}))
+        # double dosage of single pill where possible
+        mask = single_pill_eligible & already_in_single & (max_dosages < max(HYPERTENSION_DOSAGES))
+        current_meds.loc[index[mask], DOSAGE_COLUMNS] *= 2
 
-        else:  # 3 drugs
-            on_single_pill = current_meds.loc[:, SINGLE_PILL_COLUMNS].sum(axis=1) > 0
-            single_pill_dosage_mask = ((current_meds.loc[:, SINGLE_PILL_COLUMNS] == 1)
-                                       .rename(columns={d: d.replace('in_single_pill', 'dosage')
-                                                        for d in SINGLE_PILL_COLUMNS}))
-
-            single_pill_dosages = current_meds.loc[:, DOSAGE_COLUMNS].mask(np.logical_not(single_pill_dosage_mask), 0)
-
-            # double dosage of single pill where possible
-            double_single_possible = single_pill_dosages.max(axis=1) < max(HYPERTENSION_DOSAGES)
-            mask = on_single_pill & double_single_possible
-            current_meds.loc[index[mask], DOSAGE_COLUMNS] += single_pill_dosages.loc[index[mask]]
-
-            # double dosage of drug not in single pill where single pill is already at max dosage
-            mask = on_single_pill & ~double_single_possible
-            current_meds.loc[index[mask], DOSAGE_COLUMNS] += (current_meds.loc[index[mask], DOSAGE_COLUMNS]
-                                                              .mask(single_pill_dosage_mask.loc[index[mask]], 0))
-
-            # if any 2+ drugs have equal dosages, put 2 of those on a single pill
-            non_zero_dosages = current_meds.loc[~on_single_pill, DOSAGE_COLUMNS].mask(
-                current_meds.loc[~on_single_pill, DOSAGE_COLUMNS] == 0, np.nan)
-            min_dosages = non_zero_dosages.min(axis=1)
-            max_dosages = non_zero_dosages.max(axis=1)
-
-            dosages = current_meds.loc[~on_single_pill, DOSAGE_COLUMNS]
-            mins = np.tile(min_dosages, (len(DOSAGE_COLUMNS), 1)).transpose()
-            maxes = np.tile(max_dosages, (len(DOSAGE_COLUMNS), 1)).transpose()
-            two_at_min = np.equal(dosages, mins).sum(axis=1) == 2
-            two_at_max = np.equal(dosages, maxes).sum(axis=1) == 2
-            two_equal = two_at_min | two_at_max
-
-            # if no two equal dosages, set 2 highest to double dose in single pill
-            idx = index[~on_single_pill][~two_equal]
-            lowest_mask = np.equal(dosages, mins)
-            current_meds.loc[idx, DOSAGE_COLUMNS] = pd.DataFrame(maxes, columns=DOSAGE_COLUMNS,
-                                                                 index=index[~on_single_pill]).loc[idx].mask(lowest_mask, 0)
-            current_meds.loc[idx, SINGLE_PILL_COLUMNS] = (np.logical_not(lowest_mask).astype(int)
-                                                          .rename(columns={d: d.replace('dosage', 'in_single_pill')
-                                                                           for d in DOSAGE_COLUMNS}))
-
-            # if 2+ have equal dosages, choose 2 and put them in a single pill
-            idx = index[~on_single_pill][two_equal]
-            dosages = dosages.loc[two_equal]
-            equal_dosage = pd.Series(0, index=index[~on_single_pill])
-            equal_dosage.loc[two_at_min] = min_dosages.loc[two_at_min]
-            equal_dosage.loc[two_at_max] = max_dosages.loc[two_at_max]
-            equal_dosage = equal_dosage.loc[two_equal]
-
-            put_in_single_pill = pd.DataFrame(0, columns=SINGLE_PILL_COLUMNS, index=idx)
-            # FIXME: we probably actually want to choose 2 at random but that's hard so just choosing first 2 for now
-            for c in put_in_single_pill:
-                still_needs_drug = put_in_single_pill.sum(axis=1) < 2
-                # for everyone who doesn't have 2 drugs to put into a single pill, add the current drug if it's dosage
-                # is the dosage that 2+ drugs share
-                put_in_single_pill.loc[still_needs_drug, c] = ((dosages.loc[still_needs_drug,
-                                                                            c.replace('in_single_pill', 'dosage')]
-                                                                == equal_dosage.loc[still_needs_drug])
-                                                               .astype(int))
-
-            current_meds.loc[idx, SINGLE_PILL_COLUMNS] = put_in_single_pill
+        # add 1/2 of new drug where already at max dosage of single pill (will never hit this if on 3 drugs)
+        mask = single_pill_eligible & already_in_single & (max_dosages == max(HYPERTENSION_DOSAGES))
+        current_meds.loc[index[mask], DOSAGE_COLUMNS] += (
+            self.choose_half_dose_new_drug(index[mask], current_meds.loc[index[mask], DOSAGE_COLUMNS]))
 
         return current_meds
