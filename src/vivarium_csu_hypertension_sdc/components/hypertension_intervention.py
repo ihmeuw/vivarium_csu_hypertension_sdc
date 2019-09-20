@@ -8,7 +8,7 @@ from vivarium_csu_hypertension_sdc.components import utilities
 from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, HYPERTENSIVE_CONTROLLED_THRESHOLD,
                                                               SINGLE_PILL_COLUMNS, HYPERTENSION_DOSAGES,
                                                               HYPERTENSION_DRUGS, ILLEGAL_DRUG_COMBINATION)
-from vivarium_csu_hypertension_sdc.external_data.globals import FREE_CHOICE_TWO_PILL_PROBABILITY
+from vivarium_csu_hypertension_sdc.external_data.globals import FREE_CHOICE_SINGLE_PILL_PROBABILITY
 
 
 class TreatmentAlgorithm:
@@ -20,10 +20,6 @@ class TreatmentAlgorithm:
             'therapeutic_inertia': {
                 'mean': 0.136,
                 'sd': 0.0136,
-            },
-            'adverse_events': {
-                'mean': 0.1373333333,
-                'sd': 0.03069563849,
             },
             'followup_visit_interval': 90,  # days
             'treatment_ramp': 'low_and_slow'  # one of ["low_and_slow", "free_choice", "fixed_dose_combination"]
@@ -47,11 +43,12 @@ class TreatmentAlgorithm:
 
         columns_created = ['followup_date', 'last_visit_date', 'last_visit_type',
                            'high_systolic_blood_pressure_measurement',
-                           'high_systolic_blood_pressure_last_measurement_date']
+                           'high_systolic_blood_pressure_last_measurement_date',
+                           'single_pill_dr']
         builder.population.initializes_simulants(self.on_initialize_simulants,
                                                  requires_columns=DOSAGE_COLUMNS,
                                                  creates_columns=columns_created,
-                                                 requires_streams=['followup_scheduling'])
+                                                 requires_streams=['followup_scheduling', 'single_pill_dr'])
         self.population_view = builder.population.get_view(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS + columns_created
                                                            + ['alive'],
                                                            query='alive == "alive"')
@@ -60,7 +57,8 @@ class TreatmentAlgorithm:
                            'background_visit_attendance': builder.randomness.get_stream('background_visit_attendance'),
                            'sbp_measurement': builder.randomness.get_stream('sbp_measurement'),
                            'therapeutic_inertia': builder.randomness.get_stream('therapeutic_intertia'),
-                           'treatment_transition': builder.randomness.get_stream('treatment_transition')
+                           'treatment_transition': builder.randomness.get_stream('treatment_transition'),
+                           'single_pill_dr': builder.randomness.get_stream('single_pil_dr')
                            }
 
         self.ti_probability = utilities.get_therapeutic_inertia_probability(self.config.therapeutic_inertia.mean,
@@ -80,7 +78,7 @@ class TreatmentAlgorithm:
                             'fixed_dose_combination': self.transition_fdc,
                             'free_choice': self.transition_free_choice}
         self._transition_func = transition_funcs[self.config.treatment_ramp]
-        self.free_choice_two_pill_prob = FREE_CHOICE_TWO_PILL_PROBABILITY[builder.configuration.input_data.location]
+        self.free_choice_single_pill_prob = FREE_CHOICE_SINGLE_PILL_PROBABILITY[builder.configuration.input_data.location]
 
     def on_initialize_simulants(self, pop_data):
         drug_dosages = self.population_view.subview(DOSAGE_COLUMNS).get(pop_data.index)
@@ -88,7 +86,8 @@ class TreatmentAlgorithm:
 
         initialize = pd.DataFrame({'followup_date': pd.NaT, 'last_visit_date': pd.NaT, 'last_visit_type': None,
                                    'high_systolic_blood_pressure_measurement': np.nan,
-                                   'high_systolic_blood_pressure_last_measurement_date': pd.NaT},
+                                   'high_systolic_blood_pressure_last_measurement_date': pd.NaT,
+                                   'single_pill_dr': False},
                                   index=pop_data.index)
 
         durations = utilities.get_days_in_range(self.randomness['followup_scheduling'],
@@ -97,6 +96,15 @@ class TreatmentAlgorithm:
         initialize.loc[sims_on_tx, 'followup_date'] = durations + self.sim_start
         initialize.loc[sims_on_tx, 'last_visit_date'] = (self.sim_start
                                                          - pd.Timedelta(self.config.followup_visit_interval))
+        if self.config.treatment_ramp == 'fixed_dose_combination':
+            initialize.loc[:, 'single_pill_dr'] = True
+        elif self.config.treatment_ramp == 'free_choice':
+            single_pill_idx = (self.randomness['single_pill_dr']
+                               .filter_for_probability(pop_data.index, np.tile(self.free_choice_single_pill_prob,
+                                                                               len(pop_data.index))))
+            initialize.loc[single_pill_idx, 'single_pill_dr'] = True
+        # low and slow ramp is always single pill dr = False so no need to update
+
         self.population_view.update(initialize)
 
     def on_time_step(self, event):
@@ -176,8 +184,14 @@ class TreatmentAlgorithm:
         if self.config.treatment_ramp == 'low_and_slow':
             no_tx_increase_mask = dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)  # 3 drugs, each on a max dosage
         elif self.config.treatment_ramp == 'fixed_dose_combination':
-            # 3 drugs, each on a max dosage and at least 2 drugs in single pill
+            # 3 drugs, each on a max dosage and 3 drugs in single pill
             no_tx_increase_mask = (dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)) & (single_pill.sum(axis=1) >= 2)
+        else:  # free_choice
+            single_pill_dr = self.population_view.subview(['single_pill_dr']).get(index).loc[:, 'single_pill_dr']
+            # 3 drugs each on a max dosage
+            no_tx_increase_mask = dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)
+            # if assigned to single pill dr, must also be on a single pill of all 3 drugs
+            no_tx_increase_mask.loc[single_pill_dr] &= (single_pill.loc[single_pill_dr].sum(axis=1) >= 3)
 
         return index[~no_tx_increase_mask]
 
@@ -239,17 +253,22 @@ class TreatmentAlgorithm:
                 current_meds.loc[no_current_tx_mask, DOSAGE_COLUMNS])
 
         increase_tx = index[~no_current_tx_mask]
-        min_dose_drugs_mask, min_dose_drug_in_single_pill = self.get_minimum_dose_drug(increase_tx)
+        current_meds.loc[increase_tx] = self.transition_low_and_slow_fc_non_single_pill_dr(increase_tx,
+                                                                                           current_meds.loc[increase_tx])
+        return current_meds
 
-        at_max = current_meds.loc[increase_tx].mask(np.logical_not(min_dose_drugs_mask), 0).max(axis=1) == max(HYPERTENSION_DOSAGES)
+    def transition_low_and_slow_fc_non_single_pill_dr(self, index, current_meds):
+        min_dose_drugs_mask, min_dose_drug_in_single_pill = self.get_minimum_dose_drug(index)
+
+        at_max = current_meds.loc[index].mask(np.logical_not(min_dose_drugs_mask), 0).max(axis=1) == max(HYPERTENSION_DOSAGES)
 
         # already on treatment and maxed out on dosage of minimum dose drug - add half dose of new drug
-        idx = increase_tx[at_max]
+        idx = index[at_max]
         if not idx.empty:
             current_meds.loc[idx, DOSAGE_COLUMNS] += self.choose_half_dose_new_drug(idx, current_meds.loc[idx, DOSAGE_COLUMNS])
 
         # already on treatment and minimum dose drug is in a single pill - double doses of all drugs in pill
-        double_pill = increase_tx[~at_max & min_dose_drug_in_single_pill.loc[increase_tx[~at_max]]]
+        double_pill = index[~at_max & min_dose_drug_in_single_pill.loc[index[~at_max]]]
         if not double_pill.empty:
             in_pill_mask = np.logical_and(current_meds.loc[double_pill, DOSAGE_COLUMNS].mask(
                 current_meds.loc[double_pill, DOSAGE_COLUMNS] > 0, 1), current_meds.loc[double_pill, SINGLE_PILL_COLUMNS])
@@ -257,7 +276,7 @@ class TreatmentAlgorithm:
                                                               .mask(~in_pill_mask, 0))
 
         # already on treatment and minimum dose drug is not in a single pill - double dose of min dose drug
-        double_dose = increase_tx[~at_max & np.logical_not(min_dose_drug_in_single_pill.loc[increase_tx[~at_max]])]
+        double_dose = index[~at_max & np.logical_not(min_dose_drug_in_single_pill.loc[index[~at_max]])]
         if not double_dose.empty:
             current_meds.loc[double_dose, DOSAGE_COLUMNS] += (current_meds.loc[double_dose, DOSAGE_COLUMNS]
                 .mask(np.logical_not(min_dose_drugs_mask.loc[double_dose]), 0))
@@ -286,26 +305,28 @@ class TreatmentAlgorithm:
         # currently on 1 drug
         idx = index[~no_current_tx_mask & (num_drugs == 1)]
         if not idx.empty:
-            current_meds.loc[idx] = self.transition_fdc_from_one_drug(idx, current_meds.loc[idx])
+            current_meds.loc[idx] = self.transition_fdc_fc_from_one_drug(idx, current_meds.loc[idx])
 
         # currently on 2-3 drugs
         idx = index[~no_current_tx_mask & (num_drugs > 1)]
         if not idx.empty:
-            current_meds.loc[idx] = self.transition_fdc_from_multiple_drugs(idx, current_meds.loc[idx])
+            current_meds.loc[idx] = self.transition_fdc_fc_single_pill_dr_from_mult_drugs(idx, current_meds.loc[idx])
 
         return current_meds
 
-    def transition_fdc_from_one_drug(self, index, current_meds):
+    def transition_fdc_fc_from_one_drug(self, index, current_meds):
         # switch to half dose single pill combo of current drug + one other
         new_dose = self.choose_half_dose_new_drug(index, current_meds.loc[:, DOSAGE_COLUMNS])
         current_meds.loc[:, DOSAGE_COLUMNS] += new_dose
         on_meds_mask = current_meds.loc[:, DOSAGE_COLUMNS] > 0
         current_meds.loc[:, DOSAGE_COLUMNS] = current_meds.mask(on_meds_mask, 0.5)  # switch to half dose of 2 drugs
         on_meds_mask = on_meds_mask.rename(columns={d: d.replace('dosage', 'in_single_pill') for d in on_meds_mask})
-        current_meds.loc[:, SINGLE_PILL_COLUMNS] = current_meds.loc[:, SINGLE_PILL_COLUMNS].mask(on_meds_mask, 1)
+        single_pill_dr = self.population_view.subview(['single_pill_dr']).get(index).loc[:, 'single_pill_dr']
+        current_meds.loc[single_pill_dr, SINGLE_PILL_COLUMNS] = (current_meds.loc[:, SINGLE_PILL_COLUMNS]
+                                                                 .mask(on_meds_mask, 1))
         return current_meds
 
-    def transition_fdc_from_multiple_drugs(self, index, current_meds):
+    def transition_fdc_fc_single_pill_dr_from_mult_drugs(self, index, current_meds):
         non_zero_dosages = current_meds.loc[:, DOSAGE_COLUMNS].mask(current_meds.loc[:, DOSAGE_COLUMNS] == 0, np.nan)
         min_dosages = non_zero_dosages.min(axis=1)
         max_dosages = non_zero_dosages.max(axis=1)
@@ -355,12 +376,27 @@ class TreatmentAlgorithm:
         if sum(no_current_tx_mask):
             current_meds.loc[no_current_tx_mask] = self.start_free_choice(index[no_current_tx_mask])
 
-        num_drugs = current_meds[DOSAGE_COLUMNS].mask(current_meds[DOSAGE_COLUMNS] > 0, 1).sum(axis=1).loc[~no_current_tx_mask]
+        num_drugs = current_meds[DOSAGE_COLUMNS].mask(current_meds[DOSAGE_COLUMNS] > 0, 1).sum(axis=1)
 
-        for n in num_drugs.unique():
-            idx = index[num_drugs == n]
-            if not idx.empty:
-                current_meds.loc[idx] = self.transition_fdc_by_num_current_drugs(idx, n, current_meds.loc[idx])
+        # currently on 1 drug
+        idx = index[~no_current_tx_mask & (num_drugs == 1)]
+        if not idx.empty:
+            current_meds.loc[idx] = self.transition_fdc_fc_from_one_drug(idx, current_meds.loc[idx])
+
+        # currently on 2-3 drugs
+        idx = index[~no_current_tx_mask & (num_drugs > 1)]
+        single_pill_dr = self.population_view.subview(['single_pill_dr']).get(idx).loc[:, 'single_pill_dr']
+        single_pill_idx = idx[single_pill_dr]
+        if not single_pill_idx.empty:
+            current_meds.loc[single_pill_idx] = self.transition_fdc_fc_single_pill_dr_from_mult_drugs(
+                single_pill_idx, current_meds.loc[single_pill_idx]
+            )
+
+        non_single_pill_idx = idx[~single_pill_dr]
+        if not non_single_pill_idx.empty:
+            current_meds.loc[non_single_pill_idx] = self.transition_low_and_slow_fc_non_single_pill_dr(
+                non_single_pill_idx, current_meds.loc[non_single_pill_idx]
+            )
 
         return current_meds
 
@@ -368,7 +404,6 @@ class TreatmentAlgorithm:
         meds = self.choose_half_dose_new_single_pill(index)
 
         # but we actually don't want all sims to be on a single pill
-        on_two_pills = (self.randomness['treatment_transition']
-                        .filter_for_probability(index, np.tile(self.free_choice_two_pill_prob, len(index))))
-        meds.loc[on_two_pills, SINGLE_PILL_COLUMNS] = 0
+        single_pill_dr = self.population_view.subview(['single_pill_dr']).get(index).loc[:, 'single_pill_dr']
+        meds.loc[~single_pill_dr, SINGLE_PILL_COLUMNS] = 0
         return meds
