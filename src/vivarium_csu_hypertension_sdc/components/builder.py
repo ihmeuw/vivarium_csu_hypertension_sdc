@@ -48,6 +48,9 @@ def write_demographic_data(artifact, location):
         key = prefix + m
         write(artifact, key, load(key))
 
+    key = 'cause.all_causes.cause_specific_mortality_rate'
+    write(artifact, key, load(key))
+
 
 def write_ihd_data(artifact, location):
     load = get_load(location)
