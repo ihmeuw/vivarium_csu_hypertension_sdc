@@ -1,6 +1,10 @@
+from collections import Counter
+
 import pandas as pd
 
-from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS)
+from vivarium_public_health.metrics.utilities import (get_output_template, QueryString, get_age_bins,
+                                                      get_age_sex_filter_and_iterables)
+from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS, HYPERTENSION_DRUGS)
 
 
 class SimulantTrajectoryObserver:
@@ -85,3 +89,87 @@ class SimulantTrajectoryObserver:
         self.on_time_step__prepare(event)  # record once more since we were recording at the beginning of each time step
         sample_history = pd.concat(self.history_snapshots, axis=0)
         sample_history.to_hdf(self.sample_history_parameters.path, key='trajectories')
+
+
+class MedicationObserver:
+    configuration_defaults = {
+        'metrics': {
+            'medication': {
+                'by_age': False,
+                'by_year': False,
+                'by_sex': False,
+            }
+        }
+    }
+
+    @property
+    def name(self):
+        return 'medication_observer'
+
+    def setup(self, builder):
+        self.config = builder.configuration['metrics']['medication'].to_dict()
+        self.clock = builder.time.clock()
+        self.counts = Counter()
+
+        age_sex_filter, (self.ages, self.sexes) = get_age_sex_filter_and_iterables(self.config, get_age_bins(builder))
+        self.base_filter = age_sex_filter
+
+        columns_required = ['alive', 'last_prescription_date'] + DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS
+        if self.config.by_age:
+            columns_required += ['age']
+        if self.config.by_sex:
+            columns_required += ['sex']
+        self.population_view = builder.population.get_view(columns_required)
+
+        builder.value.register_value_modifier('metrics', self.metrics)
+        builder.event.register_listener('collect_metrics', self.on_collect_metrics)
+
+    def on_collect_metrics(self, event):
+        # FIXME: is the timing right here? I always get confused about whether I'm looking at things at the right time
+        pop = self.population_view.get(event.index).query('alive == "alive"')
+        pop = pop.loc[pop.last_prescription_date == event.time]
+        pop['num_in_single_pill'] = pop[SINGLE_PILL_COLUMNS].sum(axis=1)
+
+        base_key = get_output_template(**self.config).substitute(year=event.time.year)
+
+        med_counts = {}
+        for drug in HYPERTENSION_DRUGS:
+            drug_pop = pop.loc[pop[f'{drug}_dosage'] > 0]
+            if not drug_pop.empty:
+                med_counts.update(self.summarize_drug_by_group(drug_pop, drug, base_key))
+
+        self.counts.update(med_counts)
+
+    def summarize_drug_by_group(self, pop, drug, base_key):
+        drug_counts = {}
+
+        for group, age_group in self.ages:
+            start, end = age_group.age_start, age_group.age_end
+            for sex in self.sexes:
+                filter_kwargs = {'age_start': start, 'age_end': end, 'sex': sex, 'age_group': group}
+                group_key = base_key.substitute(**filter_kwargs)
+                group_filter = self.base_filter.format(**filter_kwargs)
+                in_group = pop.query(group_filter) if group_filter and not pop.empty else pop
+
+                # number of prescriptions of drug (at any dose)
+                key = group_key.substitute(measure=f'{drug}_prescription_count')
+                drug_counts[key] = len(in_group)
+
+                # total dosage of drug prescribed
+                key = group_key.substitute(measure=f'{drug}_total_dosage_prescribed')
+                drug_counts[key] = in_group[f'{drug}_dosage'].sum()
+
+                # number of times drug prescribed in single pill with 1 other drug and 2 other drugs
+                for n in [2, 3]:
+                    key = group_key.substitute(measure=f'{drug}_prescribed_in_{n}_drug_single_pill_count')
+                    drug_counts[key] = in_group.loc[(in_group[f'{drug}_in_single_pill'])
+                                                    & (in_group['num_in_single_pill'] == n)]
+
+        return drug_counts
+
+    def metrics(self, index, metrics):
+        metrics.update(self.counts)
+        return metrics
+
+    def __repr__(self):
+        return 'MedicationObserver()'
