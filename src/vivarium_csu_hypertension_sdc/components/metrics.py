@@ -307,7 +307,7 @@ class SBPTimeSeriesObserver:
 
     def should_sample(self, event_time: pd.Timestamp) -> bool:
         """Returns true if we should sample on this time step."""
-        sample_date = pd.Timestamp(year=event_time.year, **self.config.prevalence_sample_date.to_dict())
+        sample_date = pd.Timestamp(year=event_time.year, **self.config.to_dict())
         return self.clock() <= sample_date < event_time
 
     def metrics(self, index, metrics):
@@ -337,12 +337,15 @@ class DiseaseCountObserver:
         return f'disease_observer.{self.disease}'
 
     def setup(self, builder):
-        self.config = builder.configuration['metrics'][f'{self.disease}_names']
+        self.config = builder.configuration['metrics'][f'{self.disease}_observer']
         self.clock = builder.time.clock()
         self.age_bins = get_age_bins(builder)
         self.counts = Counter()
 
-        columns_required = ['alive', f'{self.disease}', f'{self.disease}_event_time']
+        model = builder.components.get_component(f'disease_model.{self.disease}')
+        self.disease_states = [s.name.split('.')[-1] for s in model.states]
+
+        columns_required = ['alive'] + [f'{state}_event_time' for state in self.disease_states]
         if self.config.by_age:
             columns_required += ['age']
         if self.config.by_sex:
@@ -351,9 +354,6 @@ class DiseaseCountObserver:
 
         builder.value.register_value_modifier('metrics', self.metrics)
         builder.event.register_listener('collect_metrics', self.on_collect_metrics)
-
-        model = builder.components.get_component(f'disease_model.{self.disease}')
-        self.disease_states = [s.name for s in model.states]
 
     def on_collect_metrics(self, event):
         pop = self.population_view.get(event.index)
