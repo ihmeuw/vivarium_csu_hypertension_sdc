@@ -269,15 +269,26 @@ class HtnMortalityObserver(MortalityObserver):
 
 class SBPTimeSeriesObserver:
 
+    configuration_defaults = {
+        'metrics': {
+            'sbp_sample_date': {
+                'month': 7,
+                'day': 15,
+            }
+        }
+    }
+
     @property
     def name(self):
         return 'sbp_time_series_observer'
 
     def setup(self, builder):
+        self.config = builder.configuration.metrics['sbp_sample_date']
+        self.clock = builder.time.clock()
+        self.sbp_time_series = {}
+
         self.sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
         self.population_view = builder.population.get_view(DOSAGE_COLUMNS + ['alive'])
-
-        self.clock = builder.time.clock()
 
         # observing on time step prepare (and then once more at end of sim) because want the blood pressure, tx status
         # to be updated for the time step before checking
@@ -285,15 +296,19 @@ class SBPTimeSeriesObserver:
         builder.event.register_listener('simulation_end', self.on_time_step_prepare)
         builder.value.register_value_modifier('metrics', self.metrics)
 
-        self.sbp_time_series = {}
-
     def on_time_step_prepare(self, event):
-        pop = self.population_view.get(event.index).query("alive == 'alive'")
-        sbp = self.sbp(pop.index)
+        if self.should_sample(event.time):
+            pop = self.population_view.get(event.index).query("alive == 'alive'")
+            sbp = self.sbp(pop.index)
 
-        treated = pop[DOSAGE_COLUMNS].sum(axis=1) > 0
-        self.sbp_time_series[f'average_sbp_among_treated_at_{self.clock()}'] = sbp.loc[treated].mean()
-        self.sbp_time_series[f'average_sbp_among_untreated_at_{self.clock()}'] = sbp.loc[~treated].mean()
+            treated = pop[DOSAGE_COLUMNS].sum(axis=1) > 0
+            self.sbp_time_series[f'average_sbp_among_treated_in_{event.time.year}'] = sbp.loc[treated].mean()
+            self.sbp_time_series[f'average_sbp_among_untreated_in_{event.time.year}'] = sbp.loc[~treated].mean()
+
+    def should_sample(self, event_time: pd.Timestamp) -> bool:
+        """Returns true if we should sample on this time step."""
+        sample_date = pd.Timestamp(year=event_time.year, **self.config.prevalence_sample_date.to_dict())
+        return self.clock() <= sample_date < event_time
 
     def metrics(self, index, metrics):
         metrics.update(self.sbp_time_series)
