@@ -153,8 +153,8 @@ def write_ckd_data(artifact, location):
     write(artifact, key, emr)
 
     # Measures for Transitions
-    key = 'cause.chronic_kidney_disease.incidence_rate'
-    write(artifact, key, load(key))
+    #key = 'cause.chronic_kidney_disease.incidence_rate'
+    #write(artifact, key, load(key))
 
 
 def write_sbp_data(artifact, location):
