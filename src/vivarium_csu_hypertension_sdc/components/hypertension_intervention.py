@@ -44,7 +44,7 @@ class TreatmentAlgorithm:
         columns_created = ['followup_date', 'last_visit_date', 'last_visit_type',
                            'high_systolic_blood_pressure_measurement',
                            'high_systolic_blood_pressure_last_measurement_date',
-                           'single_pill_dr']
+                           'single_pill_dr', 'last_prescription_date']
         builder.population.initializes_simulants(self.on_initialize_simulants,
                                                  requires_columns=DOSAGE_COLUMNS,
                                                  creates_columns=columns_created,
@@ -87,6 +87,7 @@ class TreatmentAlgorithm:
         initialize = pd.DataFrame({'followup_date': pd.NaT, 'last_visit_date': pd.NaT, 'last_visit_type': None,
                                    'high_systolic_blood_pressure_measurement': np.nan,
                                    'high_systolic_blood_pressure_last_measurement_date': pd.NaT,
+                                   'last_prescription_date': pd.NaT,
                                    'single_pill_dr': False},
                                   index=pop_data.index)
 
@@ -139,6 +140,7 @@ class TreatmentAlgorithm:
         self.transition_treatment(treatment_increase_possible.difference(lost_to_ti))
 
         self.schedule_followup(index, visit_date)  # everyone rescheduled no matter whether their tx changed or not
+        self.population_view.update(pd.Series(visit_date, index=index, name='last_prescription_date'))
 
     def attend_background(self, index, visit_date):
         sbp_measurements = self.measure_sbp(index, visit_date)
@@ -153,6 +155,7 @@ class TreatmentAlgorithm:
         start_tx = index[eligible_for_tx_mask].difference(lost_to_ti)
         self.transition_treatment(start_tx)
         self.schedule_followup(start_tx, visit_date)  # schedule only for those who started tx
+        self.population_view.update(pd.Series(visit_date, index=start_tx, name='last_prescription_date'))
 
     def measure_sbp(self, index, visit_date):
         true_exp = self.sbp(index)
