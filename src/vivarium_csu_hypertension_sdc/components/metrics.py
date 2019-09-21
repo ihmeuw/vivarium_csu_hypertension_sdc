@@ -6,7 +6,7 @@ from vivarium_public_health.metrics import MortalityObserver
 from vivarium_public_health.metrics.utilities import (get_output_template, get_age_bins, QueryString,
                                                       get_age_sex_filter_and_iterables, get_deaths,
                                                       get_years_of_life_lost, get_lived_in_span,
-                                                      get_person_time_in_span)
+                                                      get_person_time_in_span, get_disease_event_counts)
 from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS, HYPERTENSION_DRUGS,
                                                               MIN_PDC_FOR_ADHERENT)
 
@@ -298,3 +298,58 @@ class SBPTimeSeriesObserver:
     def metrics(self, index, metrics):
         metrics.update(self.sbp_time_series)
         return metrics
+
+
+class DiseaseCountObserver:
+    configuration_defaults = {
+        'metrics': {
+            'disease_observer': {
+                'by_age': False,
+                'by_year': False,
+                'by_sex': False,
+            }
+        }
+    }
+
+    def __init__(self, disease: str):
+        self.disease = disease
+        self.configuration_defaults = {
+            'metrics': {f'{disease}_observer': DiseaseCountObserver.configuration_defaults['metrics']['disease_observer']}
+        }
+
+    @property
+    def name(self):
+        return f'disease_observer.{self.disease}'
+
+    def setup(self, builder):
+        self.config = builder.configuration['metrics'][f'{self.disease}_names']
+        self.clock = builder.time.clock()
+        self.age_bins = get_age_bins(builder)
+        self.counts = Counter()
+
+        columns_required = ['alive', f'{self.disease}', f'{self.disease}_event_time']
+        if self.config.by_age:
+            columns_required += ['age']
+        if self.config.by_sex:
+            columns_required += ['sex']
+        self.population_view = builder.population.get_view(columns_required)
+
+        builder.value.register_value_modifier('metrics', self.metrics)
+        builder.event.register_listener('collect_metrics', self.on_collect_metrics)
+
+        model = builder.components.get_component(f'disease_model.{self.disease}')
+        self.disease_states = [s.name for s in model.states]
+
+    def on_collect_metrics(self, event):
+        pop = self.population_view.get(event.index)
+        for state in self.disease_states:
+            events_this_step = get_disease_event_counts(pop, self.config.to_dict(), state,
+                                                        event.time, self.age_bins)
+            self.counts.update(events_this_step)
+
+    def metrics(self, index, metrics):
+        metrics.update(self.counts)
+        return metrics
+
+    def __repr__(self):
+        return f"DiseaseCountObserver({self.disease})"
