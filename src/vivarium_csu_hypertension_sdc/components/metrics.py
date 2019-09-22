@@ -220,7 +220,7 @@ class HtnMortalityObserver(MortalityObserver):
         groups = {}
 
         treated = pop[DOSAGE_COLUMNS].sum(axis=1) > 0
-        groups['among_not_treated'] = pop.index[~treated]
+        groups['among_untreated'] = pop.index[~treated]
         groups['among_treated'] = pop.index[treated]
 
         return self.get_adherence_groups(self.get_sbp_groups(groups, index), index)
@@ -243,7 +243,7 @@ class HtnMortalityObserver(MortalityObserver):
             grp_pdc = pdc.loc[idx]
 
             adherent_groups[f'{k}_among_adherent'] = idx[grp_pdc >= MIN_PDC_FOR_ADHERENT]
-            adherent_groups[f'{k}_among_adherent'] = idx[grp_pdc < MIN_PDC_FOR_ADHERENT]
+            adherent_groups[f'{k}_among_non_adherent'] = idx[grp_pdc < MIN_PDC_FOR_ADHERENT]
         return adherent_groups
 
     def metrics(self, index, metrics):
