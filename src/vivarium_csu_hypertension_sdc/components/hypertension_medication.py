@@ -26,8 +26,9 @@ class BaselineCoverage:
         self.med_probabilities = builder.data.load('health_technology.hypertension_medication.medication_probabilities')
         self.adherent_thresholds = data_transformations.load_adherent_thresholds(builder)
 
-        self.proportion_above_hypertensive_threshold = builder.lookup.build_table(
-            builder.data.load('risk_factor.high_systolic_blood_pressure.proportion_above_hypertensive_threshold'))
+        proportion_data = builder.data.load('risk_factor.high_systolic_blood_pressure.proportion_above_hypertensive_threshold')
+        proportion_data.value += 0.0005  # Account for discrepencies between ppf and cdf functions in sbp dist.
+        self.proportion_above_hypertensive_threshold = builder.lookup.build_table(proportion_data)
 
         sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
         self.raw_sbp = lambda index: pd.Series(sbp.source(index), index=index)
