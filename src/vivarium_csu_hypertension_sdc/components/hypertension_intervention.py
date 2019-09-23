@@ -21,7 +21,7 @@ class TreatmentAlgorithm:
                 'sd': 0.0136,
             },
             'followup_visit_interval': 90,  # days
-            'treatment_ramp': 'low_and_slow'  # one of ["low_and_slow", "free_choice", "fixed_dose_combination"]
+            'treatment_ramp': 'low_and_slow'  # one of ["low_and_slow", "free_choice", "fixed_dose_combination", "hypothetical_baseline"]
         }
     }
 
@@ -79,7 +79,7 @@ class TreatmentAlgorithm:
         transition_funcs = {'low_and_slow': self.transition_low_and_slow,
                             'fixed_dose_combination': self.transition_fdc,
                             'free_choice': self.transition_free_choice,
-                            'bau': self.transition_bau}
+                            'hypothetical_baseline': self.transition_hypothetical_baseline}
         self._transition_func = transition_funcs[self.config.treatment_ramp]
         self.free_choice_single_pill_prob = FREE_CHOICE_SINGLE_PILL_PROBABILITY[builder.configuration.input_data.location]
 
@@ -199,8 +199,8 @@ class TreatmentAlgorithm:
             no_tx_increase_mask = dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)
             # if assigned to single pill dr, must also be on a single pill of all 3 drugs
             no_tx_increase_mask.loc[single_pill_dr] &= (single_pill.loc[single_pill_dr].sum(axis=1) >= 3)
-        else:  # BAU
-            # no treatment increases if already on treatment in BAU scenario - only start new treatment
+        else:  # hypothetical_baseline
+            # no treatment increases if already on treatment in hypothetical baseline scenario - only start new treatment
             no_tx_increase_mask = dosages.sum(axis=1) > 0
 
         return index[~no_tx_increase_mask]
@@ -418,7 +418,7 @@ class TreatmentAlgorithm:
         meds.loc[~single_pill_dr, SINGLE_PILL_COLUMNS] = 0
         return meds
 
-    def transition_bau(self, index):
+    def transition_hypothetical_baseline(self, index):
         current_meds = self.population_view.subview(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS).get(index)
         no_current_tx_mask = current_meds[DOSAGE_COLUMNS].sum(axis=1) == 0
         if sum(no_current_tx_mask):
