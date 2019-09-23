@@ -39,7 +39,7 @@ class SimulantTrajectoryVisualizer:
         plt.title('Healthcare utilization')
         plt.show()
 
-    def visualize_simulant_trajectory(self, enter_sim_id=False):
+    def visualize_simulant_trajectory(self, enter_sim_id=False, extra_title_key=""):
         data = self.data
 
         unique_sims = data.reset_index().simulant.drop_duplicates().sort_values()
@@ -61,8 +61,9 @@ class SimulantTrajectoryVisualizer:
             age = round(simulant.age[0], 1)
 
             min_sbp, max_sbp = get_min_max_sbp(simulant)
+            min_sbp = min(min_sbp, HYPERTENSIVE_CONTROLLED_THRESHOLD)
 
-            plt.figure(figsize=(16, 8))
+            fig=plt.figure(figsize=(16, 8))
 
             plot_sbp(simulant)
             plot_dr_visits(simulant, min_sbp)
@@ -90,7 +91,8 @@ class SimulantTrajectoryVisualizer:
 
             plot_tx_changes_in_trajectory(simulant, min_sbp)
 
-            plt.legend()
+            axes.legend(loc='lower right', bbox_to_anchor=(0.9, 0), ncol=5, borderaxespad=-1,
+                        bbox_transform=fig.transFigure)
 
             if include_pdc:
                 ax2 = axes.twinx()
@@ -101,11 +103,22 @@ class SimulantTrajectoryVisualizer:
                 limits = (min(pdc) * 0.8, max(pdc))
                 if limits[0] != limits[1]:
                     ax2.set_ylim(limits)
-                ticks = np.linspace(round(min(pdc), 1), round(max(pdc), 1), 4)
+                min_pdc = min(pdc)
+                max_pdc = max(pdc)
+                if min_pdc == max_pdc:
+                    min_pdc = max_pdc / 2
+
+                digits = 2 if min_pdc < 0.1 and max_pdc < 0.1 else 1
+                min_pdc = round(min_pdc, digits)
+                max_pdc = round(max_pdc, digits)
+                if max_pdc < max(pdc):
+                    max_pdc += 0.1
+
+                ticks = np.linspace(min_pdc, max_pdc, 3)
                 ax2.set_yticks(ticks)
                 ax2.plot(pdc, label='pdc', color='tab:orange')
 
-            plt.title(f'Trajectory for simulant {sim_id}: a {age} year-old {sex}')
+            plt.title(f'{extra_title_key.capitalize()}: Trajectory for simulant {sim_id}: a {age} year-old {sex}')
 
         return _visualize_simulant_trajectory
 
@@ -180,6 +193,7 @@ def get_dr_visits(simulant):
 
 
 def track_treatment_changes(simulant):
+    exit_time = simulant.exit_time
     simulant = simulant[DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS]
     tx_changes = pd.DataFrame(columns=['start', 'end', 'drug', 'dose', 'in_single_pill'])
     curr = {'start': simulant.index[0], 'end': pd.NaT, 'tx': simulant.iloc[0]}
@@ -194,6 +208,13 @@ def track_treatment_changes(simulant):
                                                 'dose': dose, 'in_single_pill': in_single}, ignore_index=True)
             curr['start'] = row[0]
             curr['tx'] = row[1]
+
+    max_date = tx_changes.end.max()
+    last = tx_changes.loc[tx_changes.end == max_date].copy()
+    max_date = exit_time.max() if not np.all(exit_time.isna()) else max_date
+    last.loc[:, 'start'] = max_date
+    last.loc[:, 'end'] = max_date + pd.Timedelta(days=1)
+    tx_changes = tx_changes.append(last)
 
     return tx_changes
 
