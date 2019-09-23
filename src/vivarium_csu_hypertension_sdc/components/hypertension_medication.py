@@ -98,6 +98,7 @@ class BaselineCoverage:
 
         thresholds = {k: v(index) for k, v in self.adherent_thresholds.items()}
         num_pills = utilities.get_num_pills(pop.loc[:, DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS])
+        # pdc is 0 for everyone not on treatment and everyone on treatment but not adherent
         pdc = pd.Series(0, index=index)
 
         on_tx = num_pills > 0
@@ -107,7 +108,6 @@ class BaselineCoverage:
         for cat, threshold in thresholds.items():
             pop_in_cat = pop.loc[pill_cats == cat]
             adherent = pop_in_cat.adherent_propensity <= threshold.loc[pop_in_cat.index, 'value']
-            pdc.loc[pop_in_cat[~adherent].index] = self.pdc_dist_for_non_adherent.ppf(pop_in_cat.loc[~adherent, 'pdc_propensity'])
             pdc.loc[pop_in_cat[adherent].index] = self.pdc_dist_for_adherent.ppf(pop_in_cat.loc[adherent, 'pdc_propensity'])
 
         return pdc
