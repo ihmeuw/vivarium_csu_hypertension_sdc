@@ -44,7 +44,7 @@ class SimulantTrajectoryObserver:
         columns_required = ['alive', 'age', 'sex', 'entrance_time', 'exit_time',
                             'cause_of_death',
                             'acute_myocardial_infarction_event_time',
-                            'post_myocardial_infraction_event_time',
+                            'post_myocardial_infarction_event_time',
                             'acute_ischemic_stroke_event_time',
                             'post_ischemic_stroke_event_time',
                             'acute_subarachnoid_hemorrhage_event_time',
