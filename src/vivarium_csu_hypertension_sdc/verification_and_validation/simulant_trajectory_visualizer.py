@@ -39,7 +39,7 @@ class SimulantTrajectoryVisualizer:
         plt.title('Healthcare utilization')
         plt.show()
 
-    def visualize_simulant_trajectory(self, enter_sim_id=False, extra_title_key=""):
+    def visualize_simulant_trajectory(self, enter_sim_id=False, extra_title_key="", starting_sim_id=None):
         data = self.data
 
         unique_sims = data.reset_index().simulant.drop_duplicates().sort_values()
@@ -47,7 +47,7 @@ class SimulantTrajectoryVisualizer:
         if not enter_sim_id:
             arg = (1, len(unique_sims), 1)
         else:
-            arg = Text(value=str(unique_sims[0]), placeholder='simulant id')
+            arg = Text(value=str(unique_sims[0]), placeholder='simulant id') if not starting_sim_id else str(starting_sim_id)
 
         @interact(simulant=arg, include_pdc=True)
         def _visualize_simulant_trajectory(simulant, include_pdc):
@@ -120,9 +120,9 @@ class SimulantTrajectoryVisualizer:
 
             plt.title(f'{extra_title_key.capitalize()}: Trajectory for simulant {sim_id}: a {age} year-old {sex}')
 
-        return _visualize_simulant_trajectory
+        return _visualize_simulant_trajectory(arg, True)
 
-    def visualize_simulant_treatments(self, enter_sim_id=False):
+    def visualize_simulant_treatments(self, enter_sim_id=False, extra_title_key="", starting_sim_id=None):
         data = self.data
 
         unique_sims = data.reset_index().simulant.drop_duplicates().sort_values()
@@ -130,9 +130,9 @@ class SimulantTrajectoryVisualizer:
         if not enter_sim_id:
             arg = (1, len(unique_sims), 1)
         else:
-            arg = Text(value=str(unique_sims[0]), placeholder='simulant id')
+            arg = Text(value=str(unique_sims[0]), placeholder='simulant id') if not starting_sim_id else str(starting_sim_id)
 
-        @interact(simulant=arg, treatment_graph_style=['line', 'bar'])
+        @interact(simulant=arg, treatment_graph_style=['bar', 'line'])
         def _visualize_simulant_treatments(simulant, treatment_graph_style):
             if isinstance(simulant, str):
                 sim_id = int(simulant)
@@ -141,10 +141,10 @@ class SimulantTrajectoryVisualizer:
             simulant = data.loc[sim_id]
 
             tx_changes = track_treatment_changes(simulant)
-            plt.title(f'Treatment transitions for simulant {sim_id}.')
+            plt.title(f'{extra_title_key.capitalize()}: Treatment transitions for simulant {sim_id}.')
             plot_treatments(tx_changes, treatment_graph_style)
 
-        return _visualize_simulant_treatments
+        return _visualize_simulant_treatments(arg, 'bar')
 
 
 def load_data(results_path, simulant_trajectory_file) -> pd.DataFrame:
