@@ -127,7 +127,7 @@ class TreatmentEffect:
         self.efficacy_data = data_transformations.load_efficacy_data(builder).reset_index()
 
         self.drug_efficacy = pd.Series(index=pd.MultiIndex(levels=[[], [], []],
-                                                                 labels=[[], [], []],
+                                                                 codes=[[], [], []],
                                                                  names=['simulant', 'drug', 'dosage']))
 
         self.shift_column = 'hypertension_meds_baseline_shift'

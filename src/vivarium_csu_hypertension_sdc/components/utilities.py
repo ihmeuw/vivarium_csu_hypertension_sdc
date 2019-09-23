@@ -113,7 +113,8 @@ def generate_category_drug_combos(med_probabilities: pd.DataFrame, category: str
     single_individual_pill_combos = get_single_pill_individual_pill_combinations(med_probabilities,
                                                                                  num_drugs_in_profile)
 
-    drug_combinations = pd.concat([single_pill_combos, individual_pill_combos, single_individual_pill_combos], axis=0)
+    drug_combinations = pd.concat([single_pill_combos, individual_pill_combos, single_individual_pill_combos], axis=0,
+                                  sort=True)
 
     drug_combinations = drug_combinations.reset_index(drop=True).fillna(0)
 

@@ -1,6 +1,5 @@
 from scipy import stats
 
-from itertools import combinations
 import numpy as np
 import pandas as pd
 
@@ -41,6 +40,9 @@ class TreatmentAlgorithm:
 
         self.med_probabilities = builder.data.load('health_technology.hypertension_medication.medication_probabilities')
 
+        self.therapy_categories = (builder.data.load('health_technology.hypertension_medication.therapy_category')
+                                   .set_index('therapy_category').value)
+
         columns_created = ['followup_date', 'last_visit_date', 'last_visit_type',
                            'high_systolic_blood_pressure_measurement',
                            'high_systolic_blood_pressure_last_measurement_date',
@@ -76,7 +78,8 @@ class TreatmentAlgorithm:
 
         transition_funcs = {'low_and_slow': self.transition_low_and_slow,
                             'fixed_dose_combination': self.transition_fdc,
-                            'free_choice': self.transition_free_choice}
+                            'free_choice': self.transition_free_choice,
+                            'bau': self.transition_bau}
         self._transition_func = transition_funcs[self.config.treatment_ramp]
         self.free_choice_single_pill_prob = FREE_CHOICE_SINGLE_PILL_PROBABILITY[builder.configuration.input_data.location]
 
@@ -133,11 +136,12 @@ class TreatmentAlgorithm:
 
         treatment_increase_possible = self.check_treatment_increase_possible(index[eligible_for_tx_mask])
 
-        lost_to_ti = self.randomness['therapeutic_inertia'].filter_for_probability(treatment_increase_possible,
-                                                                                   np.tile(self.ti_probability,
-                                                                                           len(treatment_increase_possible)),
-                                                                                   additional_key='lost_to_ti')
-        self.transition_treatment(treatment_increase_possible.difference(lost_to_ti))
+        if not treatment_increase_possible.empty:
+            lost_to_ti = self.randomness['therapeutic_inertia'].filter_for_probability(treatment_increase_possible,
+                                                                                       np.tile(self.ti_probability,
+                                                                                               len(treatment_increase_possible)),
+                                                                                       additional_key='lost_to_ti')
+            self.transition_treatment(treatment_increase_possible.difference(lost_to_ti))
 
         self.schedule_followup(index, visit_date)  # everyone rescheduled no matter whether their tx changed or not
         self.population_view.update(pd.Series(visit_date, index=index, name='last_prescription_date'))
@@ -189,12 +193,15 @@ class TreatmentAlgorithm:
         elif self.config.treatment_ramp == 'fixed_dose_combination':
             # 3 drugs, each on a max dosage and all in single pill
             no_tx_increase_mask = (dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)) & (single_pill.sum(axis=1) >= 3)
-        else:  # free_choice
+        elif self.config.treatment_ramp == 'free_choice':
             single_pill_dr = self.population_view.subview(['single_pill_dr']).get(index).loc[:, 'single_pill_dr']
             # 3 drugs each on a max dosage
             no_tx_increase_mask = dosages.sum(axis=1) >= 3 * max(HYPERTENSION_DOSAGES)
             # if assigned to single pill dr, must also be on a single pill of all 3 drugs
             no_tx_increase_mask.loc[single_pill_dr] &= (single_pill.loc[single_pill_dr].sum(axis=1) >= 3)
+        else:  # BAU
+            # no treatment increases if already on treatment in BAU scenario - only start new treatment
+            no_tx_increase_mask = dosages.sum(axis=1) > 0
 
         return index[~no_tx_increase_mask]
 
@@ -410,3 +417,26 @@ class TreatmentAlgorithm:
         single_pill_dr = self.population_view.subview(['single_pill_dr']).get(index).loc[:, 'single_pill_dr']
         meds.loc[~single_pill_dr, SINGLE_PILL_COLUMNS] = 0
         return meds
+
+    def transition_bau(self, index):
+        current_meds = self.population_view.subview(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS).get(index)
+        no_current_tx_mask = current_meds[DOSAGE_COLUMNS].sum(axis=1) == 0
+        if sum(no_current_tx_mask):
+            therapy_cat = self.randomness['treatment_transition'].choice(index[no_current_tx_mask],
+                                                                         self.therapy_categories.index.to_list(),
+                                                                         self.therapy_categories.values)
+            cat_groups = therapy_cat.groupby(therapy_cat).apply(lambda g: g.index)
+
+            # choose drug/pill combination first
+            drugs = pd.DataFrame(columns=HYPERTENSION_DRUGS + SINGLE_PILL_COLUMNS, index=index[no_current_tx_mask],
+                                 dtype=float)
+            for cat, idx in cat_groups.iteritems():
+                drugs.loc[idx] = utilities.get_initial_drugs_given_category(self.med_probabilities, cat,
+                                                                            idx, self.randomness['treatment_transition'])
+            # then select dosages
+            drugs.loc[:, HYPERTENSION_DRUGS] = utilities.get_initial_dosages(drugs, self.randomness['treatment_transition'])
+
+            current_meds.loc[no_current_tx_mask] = drugs.rename(columns={d: f'{d}_dosage' for d in HYPERTENSION_DRUGS})
+
+        return current_meds
+
