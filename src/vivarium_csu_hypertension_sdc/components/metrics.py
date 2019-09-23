@@ -31,7 +31,7 @@ class SimulantTrajectoryObserver:
 
     def setup(self, builder):
         self.clock = builder.time.clock()
-        self.sample_history_parameters = builder.configuration.metrics.sample_history_observer
+        self.sample_history_parameters = builder.configuration.metrics.simulant_trajectory_observer
         self.randomness = builder.randomness.get_stream("simulant_trajectory")
 
         # sets the sample index
