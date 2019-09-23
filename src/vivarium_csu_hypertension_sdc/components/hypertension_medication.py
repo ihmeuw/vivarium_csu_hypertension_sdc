@@ -97,10 +97,12 @@ class BaselineCoverage:
         pop = self.population_view.get(index)
 
         thresholds = {k: v(index) for k, v in self.adherent_thresholds.items()}
-        pill_cats = (utilities.get_num_pills(pop.loc[:, DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS])
-                     .apply(lambda n: 'multiple' if n > 1 else 'single'))
-
+        num_pills = utilities.get_num_pills(pop.loc[:, DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS])
         pdc = pd.Series(0, index=index)
+
+        on_tx = num_pills > 0
+        pill_cats = num_pills.loc[on_tx].apply(lambda n: 'multiple' if n > 1 else 'single')
+        pop = pop.loc[on_tx]
 
         for cat, threshold in thresholds.items():
             pop_in_cat = pop.loc[pill_cats == cat]
