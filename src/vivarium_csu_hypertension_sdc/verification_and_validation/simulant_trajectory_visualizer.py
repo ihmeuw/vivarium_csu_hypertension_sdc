@@ -19,11 +19,11 @@ OFFSETS = {'dr visits': -10,
 
 class SimulantTrajectoryVisualizer:
 
-    def __init__(self, results_directory, sample_history_file: str = 'sample_history.hdf'):
+    def __init__(self, results_directory, simulant_trajectory_file: str = 'simulant_trajectory.hdf'):
         register_matplotlib_converters()
         results_path = Path(results_directory)
 
-        self.data = load_data(results_path, sample_history_file)
+        self.data = load_data(results_path, simulant_trajectory_file)
         model_spec = yaml.full_load((results_path / 'model_specification.yaml').open())
         self.step_size = float(model_spec['configuration']['time']['step_size'])
 
@@ -66,7 +66,7 @@ class SimulantTrajectoryVisualizer:
 
             plot_sbp(simulant)
             plot_dr_visits(simulant, min_sbp)
-            #plot_disease_events(simulant, min_sbp)
+            plot_disease_events(simulant, min_sbp)
             plot_dead(simulant)
 
             plt.ylabel('mmHg')
@@ -134,8 +134,8 @@ class SimulantTrajectoryVisualizer:
         return _visualize_simulant_treatments
 
 
-def load_data(results_path, sample_history_file) -> pd.DataFrame:
-    data = pd.read_hdf(results_path / sample_history_file)
+def load_data(results_path, simulant_trajectory_file) -> pd.DataFrame:
+    data = pd.read_hdf(results_path / simulant_trajectory_file)
     data['untreated_sbp'] = data['true_sbp'] + data['medication_effect']
     return data
 
@@ -219,10 +219,15 @@ def plot_dr_visits(simulant, min_sbp):
 
 
 def plot_disease_events(simulant, min_sbp):
-    events = {'ischemic_heart_disease': 'tab:blue',
-              'ischemic_stroke': 'tab:orange',
-              'intracerebral_hemorrhage': 'tab:green',
-              'subarachnoid_hemorrhage': 'tab:red'}
+    events = {'acute_myocardial_infarction': 'navy',
+              'post_myocardial_infarction': 'cornflowerblue',
+              'acute_ischemic_stroke': 'darkgreen',
+              'post_ischemic_stroke': 'darkseagreen',
+              'acute_subarachnoid_hemorrhage': 'indigo',
+              'post_subarachnoid_hemorrhage': 'mediumpurple',
+              'acute_intracerebral_hemorrhage': 'darkmagenta',
+              'post_intracerebral_hemorrhage': 'plum'
+              }
     for e, color in events.items():
         col = f'{e}_event_time'
         disease_events = simulant.loc[simulant.index == simulant[col], col]
