@@ -108,6 +108,7 @@ class TreatmentAlgorithm:
                                                                                len(pop_data.index))))
             initialize.loc[single_pill_idx, 'single_pill_dr'] = True
         # low and slow ramp is always single pill dr = False so no need to update
+        # hypothetical baseline never changes treatment once initialized so single pill dr is irrelevant
 
         self.population_view.update(initialize)
 
@@ -200,7 +201,7 @@ class TreatmentAlgorithm:
             # if assigned to single pill dr, must also be on a single pill of all 3 drugs
             no_tx_increase_mask.loc[single_pill_dr] &= (single_pill.loc[single_pill_dr].sum(axis=1) >= 3)
         else:  # hypothetical_baseline
-            # no treatment increases if already on treatment in hypothetical baseline scenario - only start new treatment
+            # no increases if already on treatment in hypothetical baseline scenario - only start new treatment
             no_tx_increase_mask = dosages.sum(axis=1) > 0
 
         return index[~no_tx_increase_mask]
