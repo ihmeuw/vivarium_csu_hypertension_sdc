@@ -280,7 +280,7 @@ def write_proportion_hypertensive(artifact, location):
 def write_hypertension_medication_data(artifact, location):
     external_data_specification = {
         'adherence': {
-            'seed_columns': ['location', 'age_group_start', 'age_group_end', 'pill_category'],
+            'seed_columns': ['location'], # all adherence will use the same seeds
             'distribution': 'beta',
         },
         'medication_probabilities': {
@@ -301,7 +301,6 @@ def write_hypertension_medication_data(artifact, location):
             'distribution': 'normal',
         },
     }
-
     for k, spec in external_data_specification.items():
         data = load_external_data(k, location)
         data = generate_draws(data, spec['seed_columns'], spec['distribution'])
@@ -328,20 +327,20 @@ def generate_draws(data, seed_columns, distribution_type):
     data = pd.concat([data, draws], axis=1)
 
     if distribution_type is not None:
-        for row in data.iterrows():
-            if row[1]['sd'] != 0:
-                seed = str_to_seed('_'.join([str(s) for s in row[1][seed_columns]]))
+        for idx, row in data.iterrows():
+            if row['sd'] != 0:
+                seed = str_to_seed('_'.join([str(s) for s in row[seed_columns]]))
                 np.random.seed(seed)
                 d = np.random.random(1000)
                 if distribution_type == 'normal':
-                    dist = norm(loc=row[1]['mean'], scale=row[1]['sd'])
+                    dist = norm(loc=row['mean'], scale=row['sd'])
                 else:  # beta
                     from risk_distributions.risk_distributions import Beta
-                    params = Beta._get_parameters(mean=pd.Series(row[1]['mean']), sd=pd.Series(row[1]['sd']),
+                    params = Beta._get_parameters(mean=pd.Series(row['mean']), sd=pd.Series(row['sd']),
                                                   x_min=pd.Series(0), x_max=pd.Series(1))
                     dist = beta(**params)
 
-                data.loc[row[0], globals.DRAW_COLUMNS] = dist.ppf(d)
+                data.loc[idx, globals.DRAW_COLUMNS] = dist.ppf(d)
 
     assert np.all(~data.isna()), "Something's wrong: NaNs were generated for draws. "
     return data.drop(columns=['mean', 'sd'])
