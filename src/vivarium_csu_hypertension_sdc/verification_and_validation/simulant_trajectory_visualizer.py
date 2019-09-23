@@ -284,6 +284,9 @@ def plot_treatments(tx_changes, style='line'):
         plt.legend()
         plt.show()
     elif style == 'bar':
+        # these bar charts should just show transitions so no need to have the duplicated extra rows at the end
+        # that ensure the line charts show the entire treatment series to the end of the sim
+        tx_changes = tx_changes.loc[tx_changes.start < tx_changes.start.max()]
         drug_colors = ['red', 'blue', 'green', 'pink', 'purple']
 
         num_changes = len(tx_changes.start.unique())
