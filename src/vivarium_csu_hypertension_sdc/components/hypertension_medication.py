@@ -28,6 +28,7 @@ class BaselineCoverage:
 
         proportion_data = builder.data.load('risk_factor.high_systolic_blood_pressure.proportion_above_hypertensive_threshold')
 
+        proportion_data.value += 0.0005  # Account for discrepencies between ppf and cdf functions in sbp dist.
         self.proportion_above_hypertensive_threshold = builder.lookup.build_table(proportion_data)
 
         sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
