@@ -26,8 +26,9 @@ class BaselineCoverage:
         self.med_probabilities = builder.data.load('health_technology.hypertension_medication.medication_probabilities')
         self.adherent_thresholds = data_transformations.load_adherent_thresholds(builder)
 
-        self.proportion_above_hypertensive_threshold = builder.lookup.build_table(
-            builder.data.load('risk_factor.high_systolic_blood_pressure.proportion_above_hypertensive_threshold'))
+        proportion_data = builder.data.load('risk_factor.high_systolic_blood_pressure.proportion_above_hypertensive_threshold')
+
+        self.proportion_above_hypertensive_threshold = builder.lookup.build_table(proportion_data)
 
         sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
         self.raw_sbp = lambda index: pd.Series(sbp.source(index), index=index)
@@ -102,7 +103,7 @@ class BaselineCoverage:
 
         for cat, threshold in thresholds.items():
             pop_in_cat = pop.loc[pill_cats == cat]
-            adherent = pop_in_cat.adherent_propensity >= threshold.loc[pop_in_cat.index, 'value']
+            adherent = pop_in_cat.adherent_propensity <= threshold.loc[pop_in_cat.index, 'value']
             pdc.loc[pop_in_cat[~adherent].index] = self.pdc_dist_for_non_adherent.ppf(pop_in_cat.loc[~adherent, 'pdc_propensity'])
             pdc.loc[pop_in_cat[adherent].index] = self.pdc_dist_for_adherent.ppf(pop_in_cat.loc[adherent, 'pdc_propensity'])
 
