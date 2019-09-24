@@ -10,6 +10,7 @@ from vivarium_public_health.metrics.utilities import (get_output_template, get_a
 from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS, HYPERTENSION_DRUGS,
                                                               MIN_PDC_FOR_ADHERENT)
 
+
 class SimulantTrajectoryObserver:
 
     configuration_defaults = {
@@ -52,6 +53,7 @@ class SimulantTrajectoryObserver:
                             'acute_intracerebral_hemorrhage_event_time',
                             'post_intracerebral_hemorrhage_event_time',
                             'followup_date',
+                            'followup_type',
                             'last_visit_date',
                             'last_visit_type',
                             'high_systolic_blood_pressure_measurement',
