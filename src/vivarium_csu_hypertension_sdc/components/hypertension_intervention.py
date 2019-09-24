@@ -119,7 +119,6 @@ class TreatmentAlgorithm:
         pop = self.population_view.get(event.index)
 
         followup_scheduled = (self.clock() < pop.followup_date) & (pop.followup_date <= event.time)
-        print(pop.followup_type[followup_scheduled].value_counts())
         self.attend_confirmatory(pop.index[followup_scheduled & (pop.followup_type == 'confirmatory')], event.time)
         self.attend_maintenance(pop.index[followup_scheduled & (pop.followup_type == 'maintenance')], event.time)
         pop.loc[followup_scheduled, 'last_visit_type'] = pop.loc[followup_scheduled, 'followup_type']
