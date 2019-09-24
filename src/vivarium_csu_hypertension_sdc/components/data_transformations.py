@@ -18,6 +18,6 @@ def load_adherent_thresholds(builder) -> dict:
 
     pill_categories = ['single', 'multiple']
     adherence_data = {c: builder.lookup.build_table(data.loc[data.pill_category == c], key_columns=[],
-                                                    parameter_columns=[('age', 'age_start', 'age_end')])
+                                                    parameter_columns=['age'])
                       for c in pill_categories}
     return adherence_data
