@@ -43,7 +43,7 @@ class TreatmentAlgorithm:
         self.therapy_categories = (builder.data.load('health_technology.hypertension_medication.therapy_category')
                                    .set_index('therapy_category').value)
 
-        columns_created = ['followup_date', 'last_visit_date', 'last_visit_type',
+        columns_created = ['followup_date', 'followup_type', 'last_visit_date', 'last_visit_type',
                            'high_systolic_blood_pressure_measurement',
                            'high_systolic_blood_pressure_last_measurement_date',
                            'single_pill_dr', 'last_prescription_date']
@@ -58,7 +58,7 @@ class TreatmentAlgorithm:
         self.randomness = {'followup_scheduling': builder.randomness.get_stream('followup_scheduling'),
                            'background_visit_attendance': builder.randomness.get_stream('background_visit_attendance'),
                            'sbp_measurement': builder.randomness.get_stream('sbp_measurement'),
-                           'therapeutic_inertia': builder.randomness.get_stream('therapeutic_intertia'),
+                           'therapeutic_inertia': builder.randomness.get_stream('therapeutic_inertia'),
                            'treatment_transition': builder.randomness.get_stream('treatment_transition'),
                            'single_pill_dr': builder.randomness.get_stream('single_pil_dr')
                            }
@@ -87,7 +87,8 @@ class TreatmentAlgorithm:
         drug_dosages = self.population_view.subview(DOSAGE_COLUMNS).get(pop_data.index)
         sims_on_tx = drug_dosages.loc[drug_dosages.sum(axis=1) > 0].index
 
-        initialize = pd.DataFrame({'followup_date': pd.NaT, 'last_visit_date': pd.NaT, 'last_visit_type': None,
+        initialize = pd.DataFrame({'followup_date': pd.NaT, 'followup_type': None,
+                                   'last_visit_date': pd.NaT, 'last_visit_type': None,
                                    'high_systolic_blood_pressure_measurement': np.nan,
                                    'high_systolic_blood_pressure_last_measurement_date': pd.NaT,
                                    'last_prescription_date': pd.NaT,
@@ -100,6 +101,8 @@ class TreatmentAlgorithm:
         initialize.loc[sims_on_tx, 'followup_date'] = durations + self.sim_start
         initialize.loc[sims_on_tx, 'last_visit_date'] = (self.sim_start
                                                          - pd.Timedelta(self.config.followup_visit_interval))
+        initialize.loc[sims_on_tx, 'followup_type'] = 'maintenance'
+
         if self.config.treatment_ramp == 'fixed_dose_combination':
             initialize.loc[:, 'single_pill_dr'] = True
         elif self.config.treatment_ramp == 'free_choice':
@@ -116,9 +119,9 @@ class TreatmentAlgorithm:
         pop = self.population_view.get(event.index)
 
         followup_scheduled = (self.clock() < pop.followup_date) & (pop.followup_date <= event.time)
-
-        self.attend_followup(pop.index[followup_scheduled], event.time)
-        pop.loc[followup_scheduled, 'last_visit_type'] = 'follow_up'
+        self.attend_confirmatory(pop.index[followup_scheduled & (pop.followup_type == 'confirmatory')], event.time)
+        self.attend_maintenance(pop.index[followup_scheduled & (pop.followup_type == 'maintenance')], event.time)
+        pop.loc[followup_scheduled, 'last_visit_type'] = pop.loc[followup_scheduled, 'followup_type']
 
         background_eligible = pop.index[~followup_scheduled]
         background_attending = (self.randomness['background_visit_attendance']
@@ -131,7 +134,33 @@ class TreatmentAlgorithm:
         pop.loc[background_attending.union(pop[followup_scheduled].index), 'last_visit_date'] = event.time
         self.population_view.update(pop.loc[:, ['last_visit_type', 'last_visit_date']])
 
-    def attend_followup(self, index, visit_date):
+    def attend_confirmatory(self, index, visit_date):
+        """Patients are only scheduled for confirmatory visit if they've had an
+        SBP measurement above the threshold so if the measurement on this visit
+        is above the threshold, they've had 2 above threshold measurements and
+        should begin treatment."""
+        sbp_measurements = self.measure_sbp(index, visit_date)
+        eligible_for_tx_mask = sbp_measurements >= HYPERTENSIVE_CONTROLLED_THRESHOLD
+
+        tx_possible = index[eligible_for_tx_mask]
+        if not tx_possible.empty:
+            lost_to_ti = self.randomness['therapeutic_inertia'].filter_for_probability(tx_possible,
+                                                                                       np.tile(self.ti_probability,
+                                                                                               len(tx_possible)),
+                                                                                       additional_key='lost_to_ti')
+            # patients who don't overcome therapeutic inertia are scheduled for another confirmatory visit
+            self.schedule_followup(lost_to_ti, visit_date, 'confirmatory')
+
+            start_tx = tx_possible.difference(lost_to_ti)
+            self.transition_treatment(start_tx)
+            self.schedule_followup(start_tx, visit_date, 'maintenance')
+            self.population_view.update(pd.Series(visit_date, index=start_tx, name='last_prescription_date'))
+
+        # patients who aren't hypertensive on this visit are put back into the general population
+        self.population_view.update(pd.DataFrame({'followup_date': pd.NaT, 'followup_type': None},
+                                                 index=index[~eligible_for_tx_mask]))
+
+    def attend_maintenance(self, index, visit_date):
         sbp_measurements = self.measure_sbp(index, visit_date)
         eligible_for_tx_mask = sbp_measurements >= HYPERTENSIVE_CONTROLLED_THRESHOLD
 
@@ -144,23 +173,21 @@ class TreatmentAlgorithm:
                                                                                        additional_key='lost_to_ti')
             self.transition_treatment(treatment_increase_possible.difference(lost_to_ti))
 
-        self.schedule_followup(index, visit_date)  # everyone rescheduled no matter whether their tx changed or not
+        self.schedule_followup(index, visit_date, 'maintenance')  # everyone rescheduled whether their tx changed or not
         self.population_view.update(pd.Series(visit_date, index=index, name='last_prescription_date'))
 
     def attend_background(self, index, visit_date):
         sbp_measurements = self.measure_sbp(index, visit_date)
         followup_dates = self.population_view.subview(['followup_date']).get(index).loc[:, 'followup_date']
 
-        eligible_for_tx_mask = (sbp_measurements >= HYPERTENSIVE_CONTROLLED_THRESHOLD) & (followup_dates.isna())
+        eligible_for_confirmatory = (sbp_measurements >= HYPERTENSIVE_CONTROLLED_THRESHOLD) & (followup_dates.isna())
 
-        lost_to_ti = self.randomness['therapeutic_inertia'].filter_for_probability(index[eligible_for_tx_mask],
+        lost_to_ti = self.randomness['therapeutic_inertia'].filter_for_probability(index[eligible_for_confirmatory],
                                                                                    np.tile(self.ti_probability,
-                                                                                           sum(eligible_for_tx_mask)),
+                                                                                           sum(eligible_for_confirmatory)),
                                                                                    additional_key='lost_to_ti')
-        start_tx = index[eligible_for_tx_mask].difference(lost_to_ti)
-        self.transition_treatment(start_tx)
-        self.schedule_followup(start_tx, visit_date)  # schedule only for those who started tx
-        self.population_view.update(pd.Series(visit_date, index=start_tx, name='last_prescription_date'))
+        schedule_confirmatory = index[eligible_for_confirmatory].difference(lost_to_ti)
+        self.schedule_followup(schedule_confirmatory, visit_date, 'confirmatory')
 
     def measure_sbp(self, index, visit_date):
         true_exp = self.sbp(index)
@@ -206,10 +233,11 @@ class TreatmentAlgorithm:
 
         return index[~no_tx_increase_mask]
 
-    def schedule_followup(self, index, visit_date):
-        next_followup_date = pd.Series(visit_date + pd.Timedelta(days=self.config.followup_visit_interval),
-                                       index=index, name='followup_date')
-        self.population_view.update(next_followup_date)
+    def schedule_followup(self, index, visit_date, followup_type):
+        next_followup = pd.DataFrame({'followup_date': visit_date + pd.Timedelta(days=self.config.followup_visit_interval),
+                                      'followup_type': followup_type},
+                                     index=index)
+        self.population_view.update(next_followup)
 
     def choose_half_dose_new_drug(self, index, current_dosages):
 

@@ -120,7 +120,7 @@ class SimulantTrajectoryVisualizer:
 
             plt.title(f'{extra_title_key.capitalize()}: Trajectory for simulant {sim_id}: a {age} year-old {sex}')
 
-        return _visualize_simulant_trajectory(arg, True)
+        return _visualize_simulant_trajectory(1, True)
 
     def visualize_simulant_treatments(self, enter_sim_id=False, extra_title_key="", starting_sim_id=None):
         data = self.data
@@ -183,7 +183,8 @@ def get_dr_visits(simulant):
     attended = (simulant.loc[simulant.last_visit_date == simulant.index].groupby(['last_visit_type'])
                 .apply(lambda g: g.last_visit_date.values))
 
-    defaults = {'follow_up': 'orangered',
+    defaults = {'confirmatory': 'lightcoral',
+                'maintenance': 'firebrick',
                 'background': 'forestgreen'}
     visits = dict()
     for visit, color in defaults.items():
