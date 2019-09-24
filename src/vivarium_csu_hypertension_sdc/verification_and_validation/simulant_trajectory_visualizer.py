@@ -19,11 +19,11 @@ OFFSETS = {'dr visits': -10,
 
 class SimulantTrajectoryVisualizer:
 
-    def __init__(self, results_directory, sample_history_file: str = 'sample_history.hdf'):
+    def __init__(self, results_directory, simulant_trajectory_file: str = 'simulant_trajectory.hdf'):
         register_matplotlib_converters()
         results_path = Path(results_directory)
 
-        self.data = load_data(results_path, sample_history_file)
+        self.data = load_data(results_path, simulant_trajectory_file)
         model_spec = yaml.full_load((results_path / 'model_specification.yaml').open())
         self.step_size = float(model_spec['configuration']['time']['step_size'])
 
@@ -39,7 +39,7 @@ class SimulantTrajectoryVisualizer:
         plt.title('Healthcare utilization')
         plt.show()
 
-    def visualize_simulant_trajectory(self, enter_sim_id=False):
+    def visualize_simulant_trajectory(self, enter_sim_id=False, extra_title_key="", starting_sim_id=None):
         data = self.data
 
         unique_sims = data.reset_index().simulant.drop_duplicates().sort_values()
@@ -47,7 +47,7 @@ class SimulantTrajectoryVisualizer:
         if not enter_sim_id:
             arg = (1, len(unique_sims), 1)
         else:
-            arg = Text(value=str(unique_sims[0]), placeholder='simulant id')
+            arg = Text(value=str(unique_sims[0]), placeholder='simulant id') if not starting_sim_id else str(starting_sim_id)
 
         @interact(simulant=arg, include_pdc=True)
         def _visualize_simulant_trajectory(simulant, include_pdc):
@@ -61,12 +61,13 @@ class SimulantTrajectoryVisualizer:
             age = round(simulant.age[0], 1)
 
             min_sbp, max_sbp = get_min_max_sbp(simulant)
+            min_sbp = min(min_sbp, HYPERTENSIVE_CONTROLLED_THRESHOLD)
 
-            plt.figure(figsize=(16, 8))
+            fig=plt.figure(figsize=(16, 8))
 
             plot_sbp(simulant)
             plot_dr_visits(simulant, min_sbp)
-            #plot_disease_events(simulant, min_sbp)
+            plot_disease_events(simulant, min_sbp)
             plot_dead(simulant)
 
             plt.ylabel('mmHg')
@@ -90,7 +91,8 @@ class SimulantTrajectoryVisualizer:
 
             plot_tx_changes_in_trajectory(simulant, min_sbp)
 
-            plt.legend()
+            axes.legend(loc='lower right', bbox_to_anchor=(0.9, 0), ncol=5, borderaxespad=-1,
+                        bbox_transform=fig.transFigure)
 
             if include_pdc:
                 ax2 = axes.twinx()
@@ -101,15 +103,26 @@ class SimulantTrajectoryVisualizer:
                 limits = (min(pdc) * 0.8, max(pdc))
                 if limits[0] != limits[1]:
                     ax2.set_ylim(limits)
-                ticks = np.linspace(round(min(pdc), 1), round(max(pdc), 1), 4)
+                min_pdc = min(pdc)
+                max_pdc = max(pdc)
+                if min_pdc == max_pdc:
+                    min_pdc = max_pdc / 2
+
+                digits = 2 if min_pdc < 0.1 and max_pdc < 0.1 else 1
+                min_pdc = round(min_pdc, digits)
+                max_pdc = round(max_pdc, digits)
+                if max_pdc < max(pdc):
+                    max_pdc += 0.1
+
+                ticks = np.linspace(min_pdc, max_pdc, 3)
                 ax2.set_yticks(ticks)
                 ax2.plot(pdc, label='pdc', color='tab:orange')
 
-            plt.title(f'Trajectory for simulant {sim_id}: a {age} year-old {sex}')
+            plt.title(f'{extra_title_key.capitalize()}: Trajectory for simulant {sim_id}: a {age} year-old {sex}')
 
-        return _visualize_simulant_trajectory
+        return _visualize_simulant_trajectory(arg, True)
 
-    def visualize_simulant_treatments(self, enter_sim_id=False):
+    def visualize_simulant_treatments(self, enter_sim_id=False, extra_title_key="", starting_sim_id=None):
         data = self.data
 
         unique_sims = data.reset_index().simulant.drop_duplicates().sort_values()
@@ -117,9 +130,9 @@ class SimulantTrajectoryVisualizer:
         if not enter_sim_id:
             arg = (1, len(unique_sims), 1)
         else:
-            arg = Text(value=str(unique_sims[0]), placeholder='simulant id')
+            arg = Text(value=str(unique_sims[0]), placeholder='simulant id') if not starting_sim_id else str(starting_sim_id)
 
-        @interact(simulant=arg, treatment_graph_style=['line', 'bar'])
+        @interact(simulant=arg, treatment_graph_style=['bar', 'line'])
         def _visualize_simulant_treatments(simulant, treatment_graph_style):
             if isinstance(simulant, str):
                 sim_id = int(simulant)
@@ -128,14 +141,14 @@ class SimulantTrajectoryVisualizer:
             simulant = data.loc[sim_id]
 
             tx_changes = track_treatment_changes(simulant)
-            plt.title(f'Treatment transitions for simulant {sim_id}.')
+            plt.title(f'{extra_title_key.capitalize()}: Treatment transitions for simulant {sim_id}.')
             plot_treatments(tx_changes, treatment_graph_style)
 
-        return _visualize_simulant_treatments
+        return _visualize_simulant_treatments(arg, 'bar')
 
 
-def load_data(results_path, sample_history_file) -> pd.DataFrame:
-    data = pd.read_hdf(results_path / sample_history_file)
+def load_data(results_path, simulant_trajectory_file) -> pd.DataFrame:
+    data = pd.read_hdf(results_path / simulant_trajectory_file)
     data['untreated_sbp'] = data['true_sbp'] + data['medication_effect']
     return data
 
@@ -180,6 +193,7 @@ def get_dr_visits(simulant):
 
 
 def track_treatment_changes(simulant):
+    exit_time = simulant.exit_time
     simulant = simulant[DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS]
     tx_changes = pd.DataFrame(columns=['start', 'end', 'drug', 'dose', 'in_single_pill'])
     curr = {'start': simulant.index[0], 'end': pd.NaT, 'tx': simulant.iloc[0]}
@@ -194,6 +208,13 @@ def track_treatment_changes(simulant):
                                                 'dose': dose, 'in_single_pill': in_single}, ignore_index=True)
             curr['start'] = row[0]
             curr['tx'] = row[1]
+
+    max_date = tx_changes.end.max()
+    last = tx_changes.loc[tx_changes.end == max_date].copy()
+    max_date = exit_time.max() if not np.all(exit_time.isna()) else max_date
+    last.loc[:, 'start'] = max_date
+    last.loc[:, 'end'] = max_date + pd.Timedelta(days=1)
+    tx_changes = tx_changes.append(last)
 
     return tx_changes
 
@@ -219,10 +240,15 @@ def plot_dr_visits(simulant, min_sbp):
 
 
 def plot_disease_events(simulant, min_sbp):
-    events = {'ischemic_heart_disease': 'tab:blue',
-              'ischemic_stroke': 'tab:orange',
-              'intracerebral_hemorrhage': 'tab:green',
-              'subarachnoid_hemorrhage': 'tab:red'}
+    events = {'acute_myocardial_infarction': 'navy',
+              'post_myocardial_infarction': 'cornflowerblue',
+              'acute_ischemic_stroke': 'darkgreen',
+              'post_ischemic_stroke': 'darkseagreen',
+              'acute_subarachnoid_hemorrhage': 'indigo',
+              'post_subarachnoid_hemorrhage': 'mediumpurple',
+              'acute_intracerebral_hemorrhage': 'darkmagenta',
+              'post_intracerebral_hemorrhage': 'plum'
+              }
     for e, color in events.items():
         col = f'{e}_event_time'
         disease_events = simulant.loc[simulant.index == simulant[col], col]
@@ -258,6 +284,9 @@ def plot_treatments(tx_changes, style='line'):
         plt.legend()
         plt.show()
     elif style == 'bar':
+        # these bar charts should just show transitions so no need to have the duplicated extra rows at the end
+        # that ensure the line charts show the entire treatment series to the end of the sim
+        tx_changes = tx_changes.loc[tx_changes.start < tx_changes.start.max()]
         drug_colors = ['red', 'blue', 'green', 'pink', 'purple']
 
         num_changes = len(tx_changes.start.unique())

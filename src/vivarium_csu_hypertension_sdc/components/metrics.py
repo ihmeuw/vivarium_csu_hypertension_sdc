@@ -14,7 +14,7 @@ class SimulantTrajectoryObserver:
 
     configuration_defaults = {
         'metrics': {
-            'sample_history_observer': {
+            'simulant_trajectory_observer': {
                 'sample_size': 1000,
                 'path': f'/share/costeffectiveness/results/vivarium_csu_hypertension_sdc/simulant_trajectory.hdf'
             }
@@ -31,7 +31,7 @@ class SimulantTrajectoryObserver:
 
     def setup(self, builder):
         self.clock = builder.time.clock()
-        self.sample_history_parameters = builder.configuration.metrics.sample_history_observer
+        self.sample_history_parameters = builder.configuration.metrics.simulant_trajectory_observer
         self.randomness = builder.randomness.get_stream("simulant_trajectory")
 
         # sets the sample index
@@ -43,7 +43,14 @@ class SimulantTrajectoryObserver:
 
         columns_required = ['alive', 'age', 'sex', 'entrance_time', 'exit_time',
                             'cause_of_death',
-                            # TODO: add disease event time columns
+                            'acute_myocardial_infarction_event_time',
+                            'post_myocardial_infarction_event_time',
+                            'acute_ischemic_stroke_event_time',
+                            'post_ischemic_stroke_event_time',
+                            'acute_subarachnoid_hemorrhage_event_time',
+                            'post_subarachnoid_hemorrhage_event_time',
+                            'acute_intracerebral_hemorrhage_event_time',
+                            'post_intracerebral_hemorrhage_event_time',
                             'followup_date',
                             'last_visit_date',
                             'last_visit_type',
