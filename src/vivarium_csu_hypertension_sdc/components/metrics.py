@@ -377,3 +377,23 @@ class DiseaseCountObserver:
 
     def __repr__(self):
         return f"DiseaseCountObserver({self.disease})"
+
+
+class TimeToControlObserver:
+
+    def __init__(self, required_measurement_count: int = 3):
+        self.required_measurement_count = required_measurement_count
+
+    @property
+    def name(self):
+        return 'time_to_control_observer'
+
+    def setup(self, builder):
+        self.population_view = builder.population.get_view(['treatment_start_date',
+                                                            'last_visit_date',
+                                                            'last_visit_type',
+                                                            'high_systolic_blood_pressure_measurement_date'
+                                                            'high_systolic_blood_pressure_measurement'])
+
+        builder.value.register_value_modifier('metrics', self.metrics)
+        builder.event.register_listener('collect_metrics', self.on_collect_metrics)
