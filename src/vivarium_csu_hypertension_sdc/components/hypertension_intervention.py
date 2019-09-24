@@ -142,13 +142,21 @@ class TreatmentAlgorithm:
         sbp_measurements = self.measure_sbp(index, visit_date)
         eligible_for_tx_mask = sbp_measurements >= HYPERTENSIVE_CONTROLLED_THRESHOLD
 
-        # TODO: can confirmatory visit patients experience therapeutic inertia? what does it mean in this context?
+        tx_possible = index[eligible_for_tx_mask]
+        if not tx_possible.empty:
+            lost_to_ti = self.randomness['therapeutic_inertia'].filter_for_probability(tx_possible,
+                                                                                       np.tile(self.ti_probability,
+                                                                                               len(tx_possible)),
+                                                                                       additional_key='lost_to_ti')
+            # patients who don't overcome therapeutic inertia are scheduled for another confirmatory visit
+            self.schedule_followup(lost_to_ti, visit_date, 'confirmatory')
 
-        self.transition_treatment(index[eligible_for_tx_mask])
-        self.schedule_followup(index[eligible_for_tx_mask], visit_date, 'maintenance')
-        self.population_view.update(pd.Series(visit_date, index=index[eligible_for_tx_mask],
-                                              name='last_prescription_date'))
+            start_tx = tx_possible.difference(lost_to_ti)
+            self.transition_treatment(start_tx)
+            self.schedule_followup(start_tx, visit_date, 'maintenance')
+            self.population_view.update(pd.Series(visit_date, index=start_tx, name='last_prescription_date'))
 
+        # patients who aren't hypertensive on this visit are put back into the general population
         self.population_view.update(pd.DataFrame({'followup_date': pd.NaT, 'followup_type': None},
                                                  index=index[~eligible_for_tx_mask]))
 
