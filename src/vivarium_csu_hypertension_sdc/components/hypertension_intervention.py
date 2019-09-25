@@ -133,7 +133,7 @@ class TreatmentAlgorithm:
         followup_attending = pop.index[followup_scheduled].difference(miss_appt)
         self.attend_confirmatory(followup_attending[pop.loc[followup_attending, 'followup_type'] == 'confirmatory'],
                                  event.time)
-        self.attend_maintenance(followup_attending[pop.loc[followup_attending, 'followup_type'] == 'confirmatory'],
+        self.attend_maintenance(followup_attending[pop.loc[followup_attending, 'followup_type'] == 'maintenance'],
                                 event.time)
         pop.loc[followup_attending, 'last_visit_type'] = pop.loc[followup_attending, 'followup_type']
 
