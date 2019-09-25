@@ -108,3 +108,4 @@ configuration:
             end: 180  # days
         treatment_ramp: fixed_dose_combination
         probability_of_missed_appt: 0.1
+        prescription_duration: 90  # days

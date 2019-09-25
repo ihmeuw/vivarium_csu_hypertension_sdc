@@ -25,7 +25,8 @@ class TreatmentAlgorithm:
                 'end': 180,  # days
             },
             'treatment_ramp': 'low_and_slow',  # one of ["low_and_slow", "free_choice", "fixed_dose_combination", "hypothetical_baseline"]
-            'probability_of_missed_appt': 0.1
+            'probability_of_missed_appt': 0.1,
+            'prescription_duration': 90  # number of days a prescription lasts before refilling is required
         }
     }
 
@@ -65,6 +66,7 @@ class TreatmentAlgorithm:
                            'treatment_transition': builder.randomness.get_stream('treatment_transition'),
                            'single_pill_dr': builder.randomness.get_stream('single_pil_dr'),
                            'miss_appt': builder.randomness.get_stream('miss_appt'),
+                           'rx_scheduling': builder.randomness.get_stream('rx_scheduling'),
                            }
 
         self.ti_probability = utilities.get_therapeutic_inertia_probability(self.config.therapeutic_inertia.mean,
@@ -104,7 +106,11 @@ class TreatmentAlgorithm:
         days_to_followup = utilities.get_days_in_range(self.randomness['followup_scheduling'],
                                                        low=0, high=self.config.followup_visit_interval.end,
                                                        index=sims_on_tx)
+        days_since_prescription_was_filled = utilities.get_days_in_range(self.randomness['rx_scheduling'],
+                                                                         low=0, high=self.config.prescription_duration,
+                                                                         index=sims_on_tx)
         initialize.loc[sims_on_tx, 'followup_date'] = days_to_followup + self.sim_start
+        initialize.loc[sims_on_tx, 'last_prescription_date'] = self.sim_start - days_since_prescription_was_filled
         initialize.loc[sims_on_tx, 'followup_type'] = 'maintenance'
 
         if self.config.treatment_ramp == 'fixed_dose_combination':
@@ -121,6 +127,8 @@ class TreatmentAlgorithm:
 
     def on_time_step(self, event):
         pop = self.population_view.get(event.index)
+
+        self.refill_prescriptions(pop.index, event.time)
 
         followup_scheduled = (self.clock() < pop.followup_date) & (pop.followup_date <= event.time)
         followup_pop = pop.index[followup_scheduled]
@@ -148,11 +156,18 @@ class TreatmentAlgorithm:
         pop.loc[background_attending.union(followup_attending), 'last_visit_date'] = event.time
         self.population_view.update(pop.loc[:, ['last_visit_type', 'last_visit_date']])
 
+    def refill_prescriptions(self, index, event_time):
+        pop = self.population_view.subview(DOSAGE_COLUMNS + ['last_prescription_date']).get(index)
+        refill_time = pop.last_prescription_date + pd.Timedelta(days=self.config.prescription_duration)
+        refill = (self.clock() < refill_time) & (refill_time <= event_time) & (pop[DOSAGE_COLUMNS].sum(axis=1) > 0)
+
+        pop.loc[refill, 'last_prescription_date'] += pd.Timedelta(days=self.config.prescription_duration)
+
+        self.population_view.update(pop.last_prescription_date)
+
     def reschedule_followup(self, index, followup_types, missed_visit_date):
         self.schedule_followup(index, missed_visit_date, followup_types)
-        self.population_view.update(pd.DataFrame({'last_missed_visit_date': missed_visit_date,
-                                                  'last_prescription_date': missed_visit_date},  # meds ind from visits
-                                                 index=index))
+        self.population_view.update(pd.Series(missed_visit_date, index=index, name='last_missed_visit_date'))
 
     def attend_confirmatory(self, index, visit_date):
         """Patients are only scheduled for confirmatory visit if they've had an
@@ -174,7 +189,6 @@ class TreatmentAlgorithm:
             start_tx = tx_possible.difference(lost_to_ti)
             self.transition_treatment(start_tx)
             self.schedule_followup(start_tx, visit_date, 'maintenance')
-            self.population_view.update(pd.Series(visit_date, index=start_tx, name='last_prescription_date'))
 
         # patients who aren't hypertensive on this visit are put back into the general population
         self.population_view.update(pd.DataFrame({'followup_date': pd.NaT, 'followup_type': None},
@@ -194,7 +208,6 @@ class TreatmentAlgorithm:
             self.transition_treatment(treatment_increase_possible.difference(lost_to_ti))
 
         self.schedule_followup(index, visit_date, 'maintenance')  # everyone rescheduled whether their tx changed or not
-        self.population_view.update(pd.Series(visit_date, index=index, name='last_prescription_date'))
 
     def attend_background(self, index, visit_date):
         sbp_measurements = self.measure_sbp(index, visit_date)

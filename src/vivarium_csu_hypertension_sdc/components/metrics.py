@@ -120,6 +120,7 @@ class MedicationObserver:
         return 'medication_observer'
 
     def setup(self, builder):
+        self.clock = builder.time.clock()
         self.config = builder.configuration['metrics']['medication']
         self.counts = Counter()
 
@@ -139,7 +140,7 @@ class MedicationObserver:
     def on_collect_metrics(self, event):
         # FIXME: is the timing right here? I always get confused about whether I'm looking at things at the right time
         pop = self.population_view.get(event.index).query('alive == "alive"')
-        pop = pop.loc[pop.last_prescription_date == event.time]
+        pop = pop.loc[(self.clock() < pop.last_prescription_date) & (pop.last_prescription_date <= event.time)]
         pop['num_in_single_pill'] = pop[SINGLE_PILL_COLUMNS].sum(axis=1)
 
         base_key = get_output_template(**self.config).substitute(year=event.time.year)
