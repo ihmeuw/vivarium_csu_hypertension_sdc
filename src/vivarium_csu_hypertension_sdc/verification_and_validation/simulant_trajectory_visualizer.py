@@ -1,6 +1,5 @@
 import math
 import matplotlib.pyplot as plt
-from matplotlib import colors
 from ipywidgets import interact, Text
 from pathlib import Path
 import pandas as pd, numpy as np
