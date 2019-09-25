@@ -182,14 +182,20 @@ def get_min_max_sbp(simulant):
 def get_dr_visits(simulant):
     attended = (simulant.loc[simulant.last_visit_date == simulant.index].groupby(['last_visit_type'])
                 .apply(lambda g: g.last_visit_date.values))
+    missed = simulant.loc[simulant.last_missed_visit_date == simulant.index]
 
     defaults = {'confirmatory': 'lightcoral',
                 'maintenance': 'firebrick',
-                'background': 'forestgreen'}
+                'background': 'forestgreen',
+                'missed': 'grey'}
     visits = dict()
     for visit, color in defaults.items():
         if visit in attended.index:
             visits[visit] = (attended[visit], color)
+
+    if not missed.empty:
+        visits['missed'] = (missed.last_missed_visit_date, defaults['missed'])
+
     return visits
 
 

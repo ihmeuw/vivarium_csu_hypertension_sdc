@@ -56,6 +56,7 @@ class SimulantTrajectoryObserver:
                             'followup_type',
                             'last_visit_date',
                             'last_visit_type',
+                            'last_missed_visit_date',
                             'high_systolic_blood_pressure_measurement',
                             'high_systolic_blood_pressure_last_measurement_date'] + DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS
         self.population_view = builder.population.get_view(columns_required)

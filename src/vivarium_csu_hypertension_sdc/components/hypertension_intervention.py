@@ -20,8 +20,12 @@ class TreatmentAlgorithm:
                 'mean': 0.136,
                 'sd': 0.0136,
             },
-            'followup_visit_interval': 90,  # days
-            'treatment_ramp': 'low_and_slow'  # one of ["low_and_slow", "free_choice", "fixed_dose_combination", "hypothetical_baseline"]
+            'followup_visit_interval': {
+                'start': 90,  # days
+                'end': 180,  # days
+            },
+            'treatment_ramp': 'low_and_slow',  # one of ["low_and_slow", "free_choice", "fixed_dose_combination", "hypothetical_baseline"]
+            'probability_of_missed_appt': 0.1
         }
     }
 
@@ -36,14 +40,13 @@ class TreatmentAlgorithm:
 
         self.config = builder.configuration.hypertension_treatment
 
-        self.followup_visit_interval_days = self.config.followup_visit_interval
-
         self.med_probabilities = builder.data.load('health_technology.hypertension_medication.medication_probabilities')
 
         self.therapy_categories = (builder.data.load('health_technology.hypertension_medication.therapy_category')
                                    .set_index('therapy_category').value)
 
         columns_created = ['followup_date', 'followup_type', 'last_visit_date', 'last_visit_type',
+                           'last_missed_visit_date',
                            'high_systolic_blood_pressure_measurement',
                            'high_systolic_blood_pressure_last_measurement_date',
                            'single_pill_dr', 'last_prescription_date']
@@ -60,7 +63,8 @@ class TreatmentAlgorithm:
                            'sbp_measurement': builder.randomness.get_stream('sbp_measurement'),
                            'therapeutic_inertia': builder.randomness.get_stream('therapeutic_inertia'),
                            'treatment_transition': builder.randomness.get_stream('treatment_transition'),
-                           'single_pill_dr': builder.randomness.get_stream('single_pil_dr')
+                           'single_pill_dr': builder.randomness.get_stream('single_pil_dr'),
+                           'miss_appt': builder.randomness.get_stream('miss_appt'),
                            }
 
         self.ti_probability = utilities.get_therapeutic_inertia_probability(self.config.therapeutic_inertia.mean,
@@ -89,18 +93,17 @@ class TreatmentAlgorithm:
 
         initialize = pd.DataFrame({'followup_date': pd.NaT, 'followup_type': None,
                                    'last_visit_date': pd.NaT, 'last_visit_type': None,
+                                   'last_missed_visit_date': pd.NaT,
                                    'high_systolic_blood_pressure_measurement': np.nan,
                                    'high_systolic_blood_pressure_last_measurement_date': pd.NaT,
                                    'last_prescription_date': pd.NaT,
                                    'single_pill_dr': False},
                                   index=pop_data.index)
 
-        durations = utilities.get_days_in_range(self.randomness['followup_scheduling'],
-                                                low=0, high=self.config.followup_visit_interval,
-                                                index=sims_on_tx)
-        initialize.loc[sims_on_tx, 'followup_date'] = durations + self.sim_start
-        initialize.loc[sims_on_tx, 'last_visit_date'] = (self.sim_start
-                                                         - pd.Timedelta(self.config.followup_visit_interval))
+        days_to_followup = utilities.get_days_in_range(self.randomness['followup_scheduling'],
+                                                       low=0, high=self.config.followup_visit_interval.end,
+                                                       index=sims_on_tx)
+        initialize.loc[sims_on_tx, 'followup_date'] = days_to_followup + self.sim_start
         initialize.loc[sims_on_tx, 'followup_type'] = 'maintenance'
 
         if self.config.treatment_ramp == 'fixed_dose_combination':
@@ -119,9 +122,19 @@ class TreatmentAlgorithm:
         pop = self.population_view.get(event.index)
 
         followup_scheduled = (self.clock() < pop.followup_date) & (pop.followup_date <= event.time)
-        self.attend_confirmatory(pop.index[followup_scheduled & (pop.followup_type == 'confirmatory')], event.time)
-        self.attend_maintenance(pop.index[followup_scheduled & (pop.followup_type == 'maintenance')], event.time)
-        pop.loc[followup_scheduled, 'last_visit_type'] = pop.loc[followup_scheduled, 'followup_type']
+        followup_pop = pop.index[followup_scheduled]
+        miss_appt = self.randomness['miss_appt'].filter_for_probability(followup_pop,
+                                                                        np.tile(self.config.probability_of_missed_appt,
+                                                                                len(followup_pop)))
+
+        self.reschedule_followup(miss_appt, pop.loc[miss_appt, 'followup_type'], event.time)
+
+        followup_attending = pop.index[followup_scheduled].difference(miss_appt)
+        self.attend_confirmatory(followup_attending[pop.loc[followup_attending, 'followup_type'] == 'confirmatory'],
+                                 event.time)
+        self.attend_maintenance(followup_attending[pop.loc[followup_attending, 'followup_type'] == 'confirmatory'],
+                                event.time)
+        pop.loc[followup_attending, 'last_visit_type'] = pop.loc[followup_attending, 'followup_type']
 
         background_eligible = pop.index[~followup_scheduled]
         background_attending = (self.randomness['background_visit_attendance']
@@ -131,8 +144,14 @@ class TreatmentAlgorithm:
         self.attend_background(background_attending, event.time)
         pop.loc[background_attending, 'last_visit_type'] = 'background'
 
-        pop.loc[background_attending.union(pop[followup_scheduled].index), 'last_visit_date'] = event.time
+        pop.loc[background_attending.union(followup_attending), 'last_visit_date'] = event.time
         self.population_view.update(pop.loc[:, ['last_visit_type', 'last_visit_date']])
+
+    def reschedule_followup(self, index, followup_types, missed_visit_date):
+        self.schedule_followup(index, missed_visit_date, followup_types)
+        self.population_view.update(pd.DataFrame({'last_missed_visit_date': missed_visit_date,
+                                                  'last_prescription_date': missed_visit_date},  # meds ind from visits
+                                                 index=index))
 
     def attend_confirmatory(self, index, visit_date):
         """Patients are only scheduled for confirmatory visit if they've had an
@@ -234,9 +253,11 @@ class TreatmentAlgorithm:
         return index[~no_tx_increase_mask]
 
     def schedule_followup(self, index, visit_date, followup_type):
-        next_followup = pd.DataFrame({'followup_date': visit_date + pd.Timedelta(days=self.config.followup_visit_interval),
-                                      'followup_type': followup_type},
-                                     index=index)
+        days_to_followup = utilities.get_days_in_range(self.randomness['followup_scheduling'],
+                                                       low=self.config.followup_visit_interval.start,
+                                                       high=self.config.followup_visit_interval.end,
+                                                       index=index)
+        next_followup = pd.DataFrame({'followup_date': visit_date + days_to_followup, 'followup_type': followup_type})
         self.population_view.update(next_followup)
 
     def choose_half_dose_new_drug(self, index, current_dosages):
