@@ -25,7 +25,7 @@ class TreatmentAlgorithm:
                 'end': 180,  # days
             },
             'treatment_ramp': 'low_and_slow',  # one of ["low_and_slow", "free_choice", "fixed_dose_combination", "hypothetical_baseline"]
-            'probability_of_missed_appt': 0.1,
+            'followup_adherence': 0.9,
             'prescription_duration': 90  # number of days a prescription lasts before refilling is required
         }
     }
@@ -65,7 +65,7 @@ class TreatmentAlgorithm:
                            'therapeutic_inertia': builder.randomness.get_stream('therapeutic_inertia'),
                            'treatment_transition': builder.randomness.get_stream('treatment_transition'),
                            'single_pill_dr': builder.randomness.get_stream('single_pil_dr'),
-                           'miss_appt': builder.randomness.get_stream('miss_appt'),
+                           'followup_attendance': builder.randomness.get_stream('followup_attendance'),
                            'rx_scheduling': builder.randomness.get_stream('rx_scheduling'),
                            }
 
@@ -132,13 +132,12 @@ class TreatmentAlgorithm:
 
         followup_scheduled = (self.clock() < pop.followup_date) & (pop.followup_date <= event.time)
         followup_pop = pop.index[followup_scheduled]
-        miss_appt = self.randomness['miss_appt'].filter_for_probability(followup_pop,
-                                                                        np.tile(self.config.probability_of_missed_appt,
+        followup_attending = self.randomness['followup_attendance'].filter_for_probability(followup_pop,
+                                                                        np.tile(self.config.followup_adherence,
                                                                                 len(followup_pop)))
-
+        miss_appt = followup_pop.difference(followup_attending)
         self.reschedule_followup(miss_appt, pop.loc[miss_appt, 'followup_type'], event.time)
 
-        followup_attending = pop.index[followup_scheduled].difference(miss_appt)
         self.attend_confirmatory(followup_attending[pop.loc[followup_attending, 'followup_type'] == 'confirmatory'],
                                  event.time)
         self.attend_maintenance(followup_attending[pop.loc[followup_attending, 'followup_type'] == 'maintenance'],
