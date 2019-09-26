@@ -1,14 +1,16 @@
 from collections import Counter
 
+import numpy as np
 import pandas as pd
 
 from vivarium_public_health.metrics import MortalityObserver
 from vivarium_public_health.metrics.utilities import (get_output_template, get_age_bins, QueryString,
                                                       get_age_sex_filter_and_iterables, get_deaths,
                                                       get_years_of_life_lost, get_lived_in_span,
-                                                      get_person_time_in_span, get_disease_event_counts)
+                                                      get_person_time_in_span, get_disease_event_counts,
+                                                      get_group_counts)
 from vivarium_csu_hypertension_sdc.components.globals import (DOSAGE_COLUMNS, SINGLE_PILL_COLUMNS, HYPERTENSION_DRUGS,
-                                                              MIN_PDC_FOR_ADHERENT)
+                                                              MIN_PDC_FOR_ADHERENT, HYPERTENSIVE_CONTROLLED_THRESHOLD)
 
 
 class SimulantTrajectoryObserver:
@@ -36,11 +38,7 @@ class SimulantTrajectoryObserver:
         self.randomness = builder.randomness.get_stream("simulant_trajectory")
 
         # sets the sample index
-        builder.population.initializes_simulants(self.on_initialize_simulants,
-                                                 requires_streams=['simulant_trajectory'],
-                                                 # FIXME: this creates_columns is a hack to get around the resource
-                                                 #  mgr skipping initializers that don't create anything for now
-                                                 creates_columns=['simulant_trajectory'])
+        builder.population.initializes_simulants(self.on_initialize_simulants, requires_streams=['simulant_trajectory'])
 
         columns_required = ['alive', 'age', 'sex', 'entrance_time', 'exit_time',
                             'cause_of_death',
@@ -379,3 +377,88 @@ class DiseaseCountObserver:
 
     def __repr__(self):
         return f"DiseaseCountObserver({self.disease})"
+
+
+class TimeToControlObserver:
+    configuration_defaults = {
+        'metrics': {
+            'time_to_control_observer': {
+                'by_age': True,
+                'by_year': False,
+                'by_sex': True,
+                'measurements_to_control': 3
+            }
+        }
+    }
+
+    def __init__(self):
+        self.observations = pd.DataFrame()
+
+    @property
+    def name(self):
+        return 'time_to_control_observer'
+
+    def setup(self, builder):
+        self.config = builder.configuration.metrics.time_to_control_observer
+        self.age_bins = get_age_bins(builder)
+        self.population_view = builder.population.get_view(['treatment_start_date',
+                                                            'last_visit_date',
+                                                            'last_visit_type',
+                                                            'high_systolic_blood_pressure_measurement',
+                                                            'age', 'sex'])
+
+        builder.population.initializes_simulants(self.on_initialize_simulants, requires_columns=['sex'])
+
+        builder.value.register_value_modifier('metrics', self.metrics)
+        builder.event.register_listener('collect_metrics', self.on_collect_metrics)
+
+    def on_initialize_simulants(self, pop_data):
+        pop = self.population_view.subview(['sex']).get(pop_data.index)
+        self.observations = pd.concat([pop, pd.DataFrame({'age_at_tx_start': np.nan,
+                                                          'controlled_measurements_since_tx_start': 0,
+                                                          'time_to_control': np.nan},
+                                                         index=pop_data.index)],
+                                      axis=1)
+
+    def on_collect_metrics(self, event):
+        pop = self.population_view.get(event.index)
+
+        # started treatment this time step - record their ages
+        started_tx = pop.treatment_start_date == event.time
+        self.observations.loc[pop.index[started_tx], 'age_at_tx_start'] = pop.loc[started_tx, 'age']
+
+        # record sims attending a maintenance visit who haven't already reached the num measurements to control
+        maintenance_pop = (pop.last_visit_date == event.time) & (pop.last_visit_type == 'maintenance')
+
+        not_finalized_observations = self.observations.time_to_control.isna()
+        still_to_record = self.observations.index[not_finalized_observations]
+        record_now = pop.index[maintenance_pop].intersection(still_to_record)
+
+        controlled = pop.loc[record_now, 'high_systolic_blood_pressure_measurement'] < HYPERTENSIVE_CONTROLLED_THRESHOLD
+        self.observations.loc[record_now[controlled], 'controlled_measurements_since_tx_start'] += 1
+        # start people over if they haven't reached required number and have an uncontrolled measurement
+        self.observations.loc[record_now[~controlled], 'controlled_measurements_since_tx_start'] = 0
+
+        at_required_num = ((self.observations.controlled_measurements_since_tx_start
+                            == self.config.measurements_to_control) & not_finalized_observations)
+        self.observations.loc[at_required_num, 'time_to_control'] = (event.time
+                                                                     - pop.loc[self.observations.index[at_required_num],
+                                                                               'treatment_start_date'])
+
+    def metrics(self, index, metrics):
+        to_report = self.observations.loc[~self.observations.time_to_control.isna()]
+        base_key = (get_output_template(**self.config.to_dict())
+                    .substitute(measure='average_time_from_tx_start_to_control'))
+        average_times = get_group_counts(to_report.rename(columns={'age_at_tx_start': 'age'}), "",  base_key,
+                                         self.config.to_dict(), self.age_bins,
+                                         aggregate=lambda df: df.time_to_control.mean())
+        metrics.update(average_times)
+        return metrics
+
+
+
+
+
+
+
+

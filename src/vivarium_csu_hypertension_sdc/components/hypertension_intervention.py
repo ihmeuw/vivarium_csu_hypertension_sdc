@@ -47,6 +47,7 @@ class TreatmentAlgorithm:
                                    .set_index('therapy_category').value)
 
         columns_created = ['followup_date', 'followup_type', 'last_visit_date', 'last_visit_type',
+                           'treatment_start_date',
                            'last_missed_visit_date',
                            'high_systolic_blood_pressure_measurement',
                            'high_systolic_blood_pressure_last_measurement_date',
@@ -96,6 +97,7 @@ class TreatmentAlgorithm:
 
         initialize = pd.DataFrame({'followup_date': pd.NaT, 'followup_type': None,
                                    'last_visit_date': pd.NaT, 'last_visit_type': None,
+                                   'treatment_start_date': pd.NaT,
                                    'last_missed_visit_date': pd.NaT,
                                    'high_systolic_blood_pressure_measurement': np.nan,
                                    'high_systolic_blood_pressure_last_measurement_date': pd.NaT,
@@ -188,6 +190,7 @@ class TreatmentAlgorithm:
             start_tx = tx_possible.difference(lost_to_ti)
             self.transition_treatment(start_tx)
             self.schedule_followup(start_tx, visit_date, 'maintenance')
+            self.population_view.update(pd.Series(visit_date, index=start_tx, name='treatment_start_date'))
 
         # patients who aren't hypertensive on this visit are put back into the general population
         self.population_view.update(pd.DataFrame({'followup_date': pd.NaT, 'followup_type': None},
