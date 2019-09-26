@@ -38,11 +38,7 @@ class SimulantTrajectoryObserver:
         self.randomness = builder.randomness.get_stream("simulant_trajectory")
 
         # sets the sample index
-        builder.population.initializes_simulants(self.on_initialize_simulants,
-                                                 requires_streams=['simulant_trajectory'],
-                                                 # FIXME: this creates_columns is a hack to get around the resource
-                                                 #  mgr skipping initializers that don't create anything for now
-                                                 creates_columns=['simulant_trajectory'])
+        builder.population.initializes_simulants(self.on_initialize_simulants, requires_streams=['simulant_trajectory'])
 
         columns_required = ['alive', 'age', 'sex', 'entrance_time', 'exit_time',
                             'cause_of_death',
@@ -388,12 +384,12 @@ class TimeToControlObserver:
                 'by_age': True,
                 'by_year': False,
                 'by_sex': True,
+                'measurements_to_control': 3
             }
         }
     }
 
-    def __init__(self, required_measurement_count: int = 3):
-        self.required_measurement_count = required_measurement_count
+    def __init__(self):
         self.observations = pd.DataFrame()
 
     @property
@@ -409,11 +405,7 @@ class TimeToControlObserver:
                                                             'high_systolic_blood_pressure_measurement',
                                                             'age', 'sex'])
 
-        builder.population.initializes_simulants(self.on_initialize_simulants,
-                                                 requires_columns=['sex'],
-                                                 # FIXME: this creates_columns is a hack to get around the resource
-                                                 #  mgr skipping initializers that don't create anything for now
-                                                 creates_columns=['time_to_cotnrol'])
+        builder.population.initializes_simulants(self.on_initialize_simulants, requires_columns=['sex'])
 
         builder.value.register_value_modifier('metrics', self.metrics)
         builder.event.register_listener('collect_metrics', self.on_collect_metrics)
@@ -445,8 +437,8 @@ class TimeToControlObserver:
         # start people over if they haven't reached required number and have an uncontrolled measurement
         self.observations.loc[record_now[~controlled], 'controlled_measurements_since_tx_start'] = 0
 
-        at_required_num = ((self.observations.controlled_measurements_since_tx_start == self.required_measurement_count)
-                           & not_finalized_observations)
+        at_required_num = ((self.observations.controlled_measurements_since_tx_start
+                            == self.config.measurements_to_control) & not_finalized_observations)
         self.observations.loc[at_required_num, 'time_to_control'] = (event.time
                                                                      - pop.loc[self.observations.index[at_required_num],
                                                                                'treatment_start_date'])
