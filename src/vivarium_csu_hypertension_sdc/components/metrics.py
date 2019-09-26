@@ -56,6 +56,7 @@ class SimulantTrajectoryObserver:
                             'followup_type',
                             'last_visit_date',
                             'last_visit_type',
+                            'last_missed_visit_date',
                             'high_systolic_blood_pressure_measurement',
                             'high_systolic_blood_pressure_last_measurement_date'] + DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS
         self.population_view = builder.population.get_view(columns_required)
@@ -119,6 +120,7 @@ class MedicationObserver:
         return 'medication_observer'
 
     def setup(self, builder):
+        self.clock = builder.time.clock()
         self.config = builder.configuration['metrics']['medication']
         self.counts = Counter()
 
@@ -138,7 +140,7 @@ class MedicationObserver:
     def on_collect_metrics(self, event):
         # FIXME: is the timing right here? I always get confused about whether I'm looking at things at the right time
         pop = self.population_view.get(event.index).query('alive == "alive"')
-        pop = pop.loc[pop.last_prescription_date == event.time]
+        pop = pop.loc[(self.clock() < pop.last_prescription_date) & (pop.last_prescription_date <= event.time)]
         pop['num_in_single_pill'] = pop[SINGLE_PILL_COLUMNS].sum(axis=1)
 
         base_key = get_output_template(**self.config).substitute(year=event.time.year)
