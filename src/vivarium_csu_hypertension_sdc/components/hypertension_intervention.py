@@ -61,7 +61,7 @@ class TreatmentAlgorithm:
                            'sbp_measurement': builder.randomness.get_stream('sbp_measurement'),
                            'therapeutic_inertia': builder.randomness.get_stream('therapeutic_inertia'),
                            'treatment_transition': builder.randomness.get_stream('treatment_transition'),
-                           'single_pill_dr': builder.randomness.get_stream('single_pil_dr')
+                           'single_pill_dr': builder.randomness.get_stream('single_pill_dr')
                            }
 
         self.ti_probability = utilities.get_therapeutic_inertia_probability(self.config.therapeutic_inertia.mean,
@@ -69,7 +69,8 @@ class TreatmentAlgorithm:
                                                                             self.randomness['therapeutic_inertia'])
 
         self.utilization_data = builder.lookup.build_table(
-            builder.data.load('healthcare_entity.outpatient_visits.utilization_rate'))
+            builder.data.load('healthcare_entity.outpatient_visits.utilization_rate'), key_columns=['sex'],
+            parameter_columns=['age', 'year'])
         self.healthcare_utilization = builder.value.register_rate_producer('healthcare_utilization_rate',
                                                                            source=lambda index: self.utilization_data(index))
 

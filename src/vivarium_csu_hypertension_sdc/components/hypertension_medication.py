@@ -29,10 +29,10 @@ class BaselineCoverage:
         proportion_data = builder.data.load('risk_factor.high_systolic_blood_pressure.proportion_above_hypertensive_threshold')
 
         proportion_data.value += 0.0005  # Account for discrepencies between ppf and cdf functions in sbp dist.
-        self.proportion_above_hypertensive_threshold = builder.lookup.build_table(proportion_data)
+        self.proportion_above_hypertensive_threshold = builder.lookup.build_table(proportion_data, key_columns=['sex'],
+                                                                                  parameter_columns=['age', 'year'])
 
-        sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
-        self.raw_sbp = lambda index: pd.Series(sbp.source(index), index=index)
+        self.raw_sbp = builder.value.get_value('high_systolic_blood_pressure.exposure').source
 
         self.randomness = builder.randomness.get_stream('initial_treatment')
 
@@ -41,8 +41,8 @@ class BaselineCoverage:
         builder.population.initializes_simulants(self.on_initialize_simulants,
                                                  creates_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS
                                                                   + adherence_columns),
-                                                 requires_columns=[],
-                                                 requires_values=['high_systolic_blood_pressure.exposure'],
+                                                 requires_columns=['high_systolic_blood_pressure_propensity'],
+                                                 requires_values=[],
                                                  requires_streams=['initial_treatment'])
 
         self.pdc = builder.value.register_value_producer('hypertension_meds.pdc', self.get_pdc,
@@ -144,7 +144,7 @@ class TreatmentEffect:
 
         self.treatment_effect = builder.value.register_value_producer('hypertension_meds.effect_size',
                                                                       self.get_treatment_effect,
-                                                                      requires_columns=[DOSAGE_COLUMNS])
+                                                                      requires_columns=DOSAGE_COLUMNS)
 
         builder.value.register_value_modifier('high_systolic_blood_pressure.exposure', self.treat_sbp,
                                               requires_columns=[self.shift_column],
