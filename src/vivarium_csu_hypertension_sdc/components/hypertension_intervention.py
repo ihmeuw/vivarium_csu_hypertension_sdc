@@ -63,7 +63,7 @@ class TreatmentAlgorithm:
                            'sbp_measurement': builder.randomness.get_stream('sbp_measurement'),
                            'therapeutic_inertia': builder.randomness.get_stream('therapeutic_inertia'),
                            'treatment_transition': builder.randomness.get_stream('treatment_transition'),
-                           'single_pill_dr': builder.randomness.get_stream('single_pil_dr'),
+                           'single_pill_dr': builder.randomness.get_stream('single_pill_dr'),
                            'miss_appt': builder.randomness.get_stream('miss_appt'),
                            }
 
