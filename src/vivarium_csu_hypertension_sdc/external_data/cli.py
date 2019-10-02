@@ -19,7 +19,7 @@ def pcalculate_ckd_rr(location):
         data_file.unlink()
 
     output_path = ckd_rr.RR_DATA_FOLDER / location
-    output_path.mkdir(parents=True)
+    output_path.mkdir(parents=True, exist_ok=True)
 
     logger.info('Submitting jobs.')
     with drmaa.Session() as s:

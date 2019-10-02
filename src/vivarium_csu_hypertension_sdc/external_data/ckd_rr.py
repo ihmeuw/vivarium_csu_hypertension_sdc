@@ -14,7 +14,7 @@ RR_DATA_FOLDER = ARTIFACT_FOLDER / 'vivarium_csu_hypertension_sdc' / 'ckd_rr'
 
 
 def calc_ckd_rr(location, draw):
-    artifact = Artifact(RR_DATA_FOLDER.parent() / f'{location}.hdf', filter_terms=[f'draw == {draw}'])
+    artifact = Artifact(RR_DATA_FOLDER.parent / f'{location}.hdf', filter_terms=[f'draw == {draw}'])
 
     tmred = risk_factors.high_systolic_blood_pressure.tmred
     tmrel = (tmred.min + tmred.max) / 2
