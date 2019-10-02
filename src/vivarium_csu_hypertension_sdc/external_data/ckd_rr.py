@@ -67,7 +67,7 @@ def calc_ckd_rr(location, draw):
     out = pd.DataFrame(data=1., columns=[f'draw_{draw}'], index=idx)
 
     for i in range(len(sub_idx)):
-        rr = find_rr(w, x_v[i, draw], sd_v[i, draw], paf_v[i, draw])
+        rr = find_rr(w, x_v[i], sd_v[i], paf_v[i])
         out.loc[sub_idx[i], f'draw_{draw}'] = rr.x[0]
 
     return out
