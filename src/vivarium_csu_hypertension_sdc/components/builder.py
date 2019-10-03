@@ -156,8 +156,6 @@ def write_ckd_data(artifact, location):
     ylds = utilities.reshape(ylds, value_cols=globals.DRAW_COLUMNS)
     ylds = utilities.scrub_gbd_conventions(ylds, location)
     ylds = utilities.sort_hierarchical_data(ylds)
-    ylds = split_interval(ylds, interval_column='age', split_column_prefix='age')
-    ylds = split_interval(ylds, interval_column='year', split_column_prefix='year')
     dw = (ylds / prevalence).fillna(0).replace([np.inf, -np.inf], 0)
     write(artifact, key, dw)
 
