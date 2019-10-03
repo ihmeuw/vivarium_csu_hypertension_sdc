@@ -38,7 +38,7 @@ components:
         - DiseaseCountObserver('intracerebral_hemorrhage')
         - DiseaseCountObserver('chronic_kidney_disease')
         - SBPTimeSeriesObserver()
-        - TimeToControlObserver()
+        #- TimeToControlObserver()
 
         #- SimulantTrajectoryObserver()
 
