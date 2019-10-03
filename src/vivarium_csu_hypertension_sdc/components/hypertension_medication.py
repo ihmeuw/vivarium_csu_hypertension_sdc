@@ -33,8 +33,7 @@ class BaselineCoverage:
                                                                                   key_columns=['sex'],
                                                                                   parameter_columns=['age', 'year'])
 
-        sbp = builder.value.get_value('high_systolic_blood_pressure.exposure')
-        self.raw_sbp = lambda index: pd.Series(sbp.source(index), index=index)
+        self.raw_sbp = builder.value.get_value('high_systolic_blood_pressure.exposure').source
 
         self.randomness = builder.randomness.get_stream('initial_treatment')
 
@@ -99,15 +98,17 @@ class BaselineCoverage:
         pop = self.population_view.get(index)
 
         thresholds = {k: v(index) for k, v in self.adherent_thresholds.items()}
-        pill_cats = (utilities.get_num_pills(pop.loc[:, DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS])
-                     .apply(lambda n: 'multiple' if n > 1 else 'single'))
-
+        num_pills = utilities.get_num_pills(pop.loc[:, DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS])
+        # pdc is 0 for everyone not on treatment and everyone on treatment but not adherent
         pdc = pd.Series(0, index=index)
+
+        on_tx = num_pills > 0
+        pill_cats = num_pills.loc[on_tx].apply(lambda n: 'multiple' if n > 1 else 'single')
+        pop = pop.loc[on_tx]
 
         for cat, threshold in thresholds.items():
             pop_in_cat = pop.loc[pill_cats == cat]
             adherent = pop_in_cat.adherent_propensity <= threshold.loc[pop_in_cat.index, 'value']
-            pdc.loc[pop_in_cat[~adherent].index] = self.pdc_dist_for_non_adherent.ppf(pop_in_cat.loc[~adherent, 'pdc_propensity'])
             pdc.loc[pop_in_cat[adherent].index] = self.pdc_dist_for_adherent.ppf(pop_in_cat.loc[adherent, 'pdc_propensity'])
 
         return pdc
@@ -127,7 +128,7 @@ class TreatmentEffect:
         self.efficacy_data = data_transformations.load_efficacy_data(builder).reset_index()
 
         self.drug_efficacy = pd.Series(index=pd.MultiIndex(levels=[[], [], []],
-                                                                 labels=[[], [], []],
+                                                                 codes=[[], [], []],
                                                                  names=['simulant', 'drug', 'dosage']))
 
         self.shift_column = 'hypertension_meds_baseline_shift'
@@ -144,7 +145,7 @@ class TreatmentEffect:
 
         self.treatment_effect = builder.value.register_value_producer('hypertension_meds.effect_size',
                                                                       self.get_treatment_effect,
-                                                                      requires_columns=[DOSAGE_COLUMNS])
+                                                                      requires_columns=DOSAGE_COLUMNS)
 
         builder.value.register_value_modifier('high_systolic_blood_pressure.exposure', self.treat_sbp,
                                               requires_columns=[self.shift_column],

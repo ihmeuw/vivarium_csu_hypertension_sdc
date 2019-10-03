@@ -38,6 +38,7 @@ components:
         - DiseaseCountObserver('intracerebral_hemorrhage')
         - DiseaseCountObserver('chronic_kidney_disease')
         - SBPTimeSeriesObserver()
+        - TimeToControlObserver()
 
         #- SimulantTrajectoryObserver()
 
@@ -97,6 +98,11 @@ configuration:
             by_age: True
             by_sex: True
             by_year: False
+        time_to_control_observer:
+            by_age: True  # this is age at tx start
+            by_sex: True
+            by_year: False
+            measurements_to_control: 3  # number of consecutive maintenance-visit sbp measurements below 140
 
     hypertension_treatment:
         high_systolic_blood_pressure_measurement:
@@ -107,5 +113,9 @@ configuration:
         adverse_events:
             mean: 0.1373333333
             sd: 0.03069563849
-        followup_visit_interval: 90  # days
+        followup_visit_interval:
+            start: 90  # days
+            end: 180  # days
         treatment_ramp: fixed_dose_combination
+        followup_adherence: 0.9
+        prescription_duration: 90  # days
