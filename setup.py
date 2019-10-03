@@ -60,6 +60,7 @@ if __name__ == "__main__":
 
         entry_points='''
                [console_scripts]
+               pcalculate_ckd_rr=vivarium_csu_hypertension_sdc.external_data.cli:pcalculate_ckd_rr
                pcalculate_proportion_hypertensive=vivarium_csu_hypertension_sdc.external_data.cli:pcalculate_proportion_hypertensive
                build_htn_artifact=vivarium_csu_hypertension_sdc.cli:build_htn_artifact
                make_specs=vivarium_csu_hypertension_sdc.cli:make_specs

@@ -29,7 +29,8 @@ class BaselineCoverage:
         proportion_data = builder.data.load('risk_factor.high_systolic_blood_pressure.proportion_above_hypertensive_threshold')
 
         proportion_data.value += 0.0005  # Account for discrepencies between ppf and cdf functions in sbp dist.
-        self.proportion_above_hypertensive_threshold = builder.lookup.build_table(proportion_data, key_columns=['sex'],
+        self.proportion_above_hypertensive_threshold = builder.lookup.build_table(proportion_data,
+                                                                                  key_columns=['sex'],
                                                                                   parameter_columns=['age', 'year'])
 
         self.raw_sbp = builder.value.get_value('high_systolic_blood_pressure.exposure').source
@@ -41,8 +42,8 @@ class BaselineCoverage:
         builder.population.initializes_simulants(self.on_initialize_simulants,
                                                  creates_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS
                                                                   + adherence_columns),
-                                                 requires_columns=['high_systolic_blood_pressure_propensity'],
-                                                 requires_values=[],
+                                                 requires_columns=[],
+                                                 requires_values=['high_systolic_blood_pressure.propensity'],
                                                  requires_streams=['initial_treatment'])
 
         self.pdc = builder.value.register_value_producer('hypertension_meds.pdc', self.get_pdc,

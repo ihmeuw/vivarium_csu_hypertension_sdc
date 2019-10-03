@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm, beta
 
-from gbd_mapping import risk_factors
+from gbd_mapping import risk_factors, causes
 from vivarium import Artifact
 from vivarium.framework.artifact import get_location_term
 from vivarium.framework.artifact.hdf import EntityKey
@@ -139,22 +139,33 @@ def write_ckd_data(artifact, location):
     # Measures for Disease Model
     key = f'cause.chronic_kidney_disease.cause_specific_mortality_rate'
     csmr = load(key)
-    write(artifact, key, csmr)
+    write(artifact, key, csmr.copy())
 
     # Measures for Disease States
     key = 'cause.chronic_kidney_disease.prevalence'
     prevalence = load(key)
-    write(artifact, key, prevalence)
+    write(artifact, key, prevalence.copy())
 
-    # TODO: Find source for YLDs at the draw level to back calc disability weight.
+    key = 'cause.chronic_kidney_disease.disability_weight'
+    df = gbd.get_incidence_prevalence(causes.chronic_kidney_disease.gbd_id, utility_data.get_location_id(location))
+    ylds = df[df.measure_id == globals.MEASURES['YLDs']]
+    ylds = utilities.filter_data_by_restrictions(ylds, causes.chronic_kidney_disease, 'yld',
+                                                 utility_data.get_age_group_ids())
+    ylds = utilities.normalize(ylds, fill_value=0)
+    ylds = ylds.filter(globals.DEMOGRAPHIC_COLUMNS + globals.DRAW_COLUMNS)
+    ylds = utilities.reshape(ylds, value_cols=globals.DRAW_COLUMNS)
+    ylds = utilities.scrub_gbd_conventions(ylds, location)
+    ylds = utilities.sort_hierarchical_data(ylds)
+    dw = (ylds / prevalence).fillna(0).replace([np.inf, -np.inf], 0)
+    write(artifact, key, dw)
 
     key = 'cause.chronic_kidney_disease.excess_mortality_rate'
     emr = (csmr / prevalence).fillna(0).replace([np.inf, -np.inf], 0)
     write(artifact, key, emr)
 
     # Measures for Transitions
-    #key = 'cause.chronic_kidney_disease.incidence_rate'
-    #write(artifact, key, load(key))
+    key = 'cause.chronic_kidney_disease.incidence_rate'
+    write(artifact, key, load(key))
 
 
 def write_sbp_data(artifact, location):
@@ -193,10 +204,8 @@ def write_sbp_data(artifact, location):
     data = utilities.scrub_gbd_conventions(data, location)
     data = utilities.sort_hierarchical_data(data)
 
-
     key = prefix + 'population_attributable_fraction'
     write(artifact, key, data)
-    #ckd_paf = data[data.affected_entity == 'chronic_kidney_disease']
 
     data = gbd.get_relative_risk(sbp.gbd_id, utility_data.get_location_id(location))
     data = utilities.convert_affected_entity(data, 'cause_id')
@@ -220,14 +229,23 @@ def write_sbp_data(artifact, location):
     data = utilities.reshape(data)
     data = utilities.scrub_gbd_conventions(data, location)
     data = utilities.sort_hierarchical_data(data)
-    #data = append_ckd_rr(data, ckd_paf)
-
+    data = split_interval(data, interval_column='age', split_column_prefix='age')
+    data = split_interval(data, interval_column='year', split_column_prefix='year')
+    loc = location.lower().replace(' ', '_')
+    ckd_rr = pd.read_hdf(f'/share/costeffectiveness/artifacts/vivarium_csu_hypertension_sdc/ckd_rr/{loc}.hdf')
+    ckd_rr = ckd_rr.reset_index()
+    ckd_rr['parameter'] = 'per unit'
+    ckd_rr['affected_entity'] = 'chronic_kidney_disease'
+    ckd_rr['affected_measure'] = 'incidence_rate'
+    ckd_rr = ckd_rr.set_index(['location', 'sex', 'age_start', 'year_start',
+                               'affected_entity', 'affected_measure', 'parameter',
+                               'age_end', 'year_end'])
+    data = pd.concat([data, ckd_rr])
     key = prefix + 'relative_risk'
-    write(artifact, key, data)
+    artifact.write(key, data)
 
 
 def write(artifact, key, data):
-
     data = split_interval(data, interval_column='age', split_column_prefix='age')
     data = split_interval(data, interval_column='year', split_column_prefix='year')
     artifact.write(key, data)
@@ -265,11 +283,6 @@ def load_em_from_meid(meid, location):
     return utilities.sort_hierarchical_data(data)
 
 
-def append_ckd_rr(data, ckd_paf):
-    # TODO
-    return data
-
-
 def write_proportion_hypertensive(artifact, location):
     location = location.replace(' ', '_').replace("'", "-").lower()
     data = pd.read_hdf(HYPERTENSION_DATA_FOLDER / f'{location}.hdf', HYPERTENSION_HDF_KEY)
@@ -301,6 +314,7 @@ def write_hypertension_medication_data(artifact, location):
             'distribution': 'normal',
         },
     }
+
     for k, spec in external_data_specification.items():
         data = load_external_data(k, location)
         data = generate_draws(data, spec['seed_columns'], spec['distribution'])

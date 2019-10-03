@@ -1,0 +1,6 @@
+input_draw_count: 15
+random_seed_count: 50
+
+branches:
+  - hypertension_treatment:
+      treatment_ramp: ['low_and_slow', 'free_choice', 'fixed_dose_combination', 'hypothetical_baseline']
