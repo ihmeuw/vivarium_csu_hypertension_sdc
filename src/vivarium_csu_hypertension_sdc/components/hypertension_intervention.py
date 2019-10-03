@@ -65,8 +65,10 @@ class TreatmentAlgorithm:
                                                                             self.config.therapeutic_inertia.sd,
                                                                             self.randomness['therapeutic_inertia'])
 
-        self.utilization_data = builder.lookup.build_table(
-            builder.data.load('healthcare_entity.outpatient_visits.utilization_rate'))
+        utilization_data = builder.data.load('healthcare_entity.outpatient_visits.utilization_rate')
+        self.utilization_data = builder.lookup.build_table(utilization_data,
+                                                           key_columns=['sex'],
+                                                           parameter_columns=['age', 'year'])
         self.healthcare_utilization = builder.value.register_rate_producer('healthcare_utilization_rate',
                                                                            source=lambda index: self.utilization_data(index))
 
