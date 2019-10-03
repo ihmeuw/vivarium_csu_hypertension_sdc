@@ -3,8 +3,11 @@ components:
         population:
             - BasePopulation()
             - Mortality()
+        disease:
+            - SI('chronic_kidney_disease')
         risks:
             - Risk("risk_factor.high_systolic_blood_pressure")
+            - RiskEffect('risk_factor.high_systolic_blood_pressure', 'cause.chronic_kidney_disease.incidence_rate')
         metrics:
             - DisabilityObserver()
 
@@ -33,6 +36,7 @@ components:
         - DiseaseCountObserver('ischemic_stroke')
         - DiseaseCountObserver('subarachnoid_hemorrhage')
         - DiseaseCountObserver('intracerebral_hemorrhage')
+        - DiseaseCountObserver('chronic_kidney_disease')
         - SBPTimeSeriesObserver()
 
         #- SimulantTrajectoryObserver()

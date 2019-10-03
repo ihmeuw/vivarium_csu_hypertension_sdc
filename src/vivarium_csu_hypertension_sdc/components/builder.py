@@ -139,12 +139,12 @@ def write_ckd_data(artifact, location):
     # Measures for Disease Model
     key = f'cause.chronic_kidney_disease.cause_specific_mortality_rate'
     csmr = load(key)
-    write(artifact, key, csmr)
+    write(artifact, key, csmr.copy())
 
     # Measures for Disease States
     key = 'cause.chronic_kidney_disease.prevalence'
     prevalence = load(key)
-    write(artifact, key, prevalence)
+    write(artifact, key, prevalence.copy())
 
     key = 'cause.chronic_kidney_disease.disability_weight'
     df = gbd.get_incidence_prevalence(causes.chronic_kidney_disease.gbd_id, utility_data.get_location_id(location))
@@ -156,7 +156,6 @@ def write_ckd_data(artifact, location):
     ylds = utilities.reshape(ylds, value_cols=globals.DRAW_COLUMNS)
     ylds = utilities.scrub_gbd_conventions(ylds, location)
     ylds = utilities.sort_hierarchical_data(ylds)
-    ylds = split_interval(ylds, interval_column='age', split_column_prefix='age')
     dw = (ylds / prevalence).fillna(0).replace([np.inf, -np.inf], 0)
     write(artifact, key, dw)
 
@@ -230,7 +229,10 @@ def write_sbp_data(artifact, location):
     data = utilities.reshape(data)
     data = utilities.scrub_gbd_conventions(data, location)
     data = utilities.sort_hierarchical_data(data)
-    ckd_rr = pd.read_hdf(f'/share/costeffectiveness/artifacts/vivarium_csu_hypertension_sdc/ckd_rr/{location}.hdf')
+    data = split_interval(data, interval_column='age', split_column_prefix='age')
+    data = split_interval(data, interval_column='year', split_column_prefix='year')
+    loc = location.lower().replace(' ', '_')
+    ckd_rr = pd.read_hdf(f'/share/costeffectiveness/artifacts/vivarium_csu_hypertension_sdc/ckd_rr/{loc}.hdf')
     ckd_rr = ckd_rr.reset_index()
     ckd_rr['parameter'] = 'per unit'
     ckd_rr['affected_entity'] = 'chronic_kidney_disease'
@@ -240,7 +242,7 @@ def write_sbp_data(artifact, location):
                                'age_end', 'year_end'])
     data = pd.concat([data, ckd_rr])
     key = prefix + 'relative_risk'
-    write(artifact, key, data)
+    artifact.write(key, data)
 
 
 def write(artifact, key, data):
