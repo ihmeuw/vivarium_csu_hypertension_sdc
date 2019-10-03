@@ -44,7 +44,7 @@ class BaselineCoverage:
                                                  creates_columns=(DOSAGE_COLUMNS + SINGLE_PILL_COLUMNS
                                                                   + adherence_columns),
                                                  requires_columns=[],
-                                                 requires_values=['high_systolic_blood_pressure.exposure'],
+                                                 requires_values=['high_systolic_blood_pressure.propensity'],
                                                  requires_streams=['initial_treatment'])
 
         self.pdc = builder.value.register_value_producer('hypertension_meds.pdc', self.get_pdc,
