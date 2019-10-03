@@ -153,8 +153,8 @@ def write_ckd_data(artifact, location):
     write(artifact, key, emr)
 
     # Measures for Transitions
-    #key = 'cause.chronic_kidney_disease.incidence_rate'
-    #write(artifact, key, load(key))
+    key = 'cause.chronic_kidney_disease.incidence_rate'
+    write(artifact, key, load(key))
 
 
 def write_sbp_data(artifact, location):
@@ -193,10 +193,8 @@ def write_sbp_data(artifact, location):
     data = utilities.scrub_gbd_conventions(data, location)
     data = utilities.sort_hierarchical_data(data)
 
-
     key = prefix + 'population_attributable_fraction'
     write(artifact, key, data)
-    #ckd_paf = data[data.affected_entity == 'chronic_kidney_disease']
 
     data = gbd.get_relative_risk(sbp.gbd_id, utility_data.get_location_id(location))
     data = utilities.convert_affected_entity(data, 'cause_id')
@@ -220,14 +218,20 @@ def write_sbp_data(artifact, location):
     data = utilities.reshape(data)
     data = utilities.scrub_gbd_conventions(data, location)
     data = utilities.sort_hierarchical_data(data)
-    #data = append_ckd_rr(data, ckd_paf)
-
+    ckd_rr = pd.read_hdf(f'/share/costeffectiveness/artifacts/vivarium_csu_hypertension_sdc/ckd_rr/{location}.hdf')
+    ckd_rr = ckd_rr.reset_index()
+    ckd_rr['parameter'] = 'per unit'
+    ckd_rr['affected_entity'] = 'chronic_kidney_disease'
+    ckd_rr['affected_measure'] = 'incidence_rate'
+    ckd_rr = ckd_rr.set_index(['location', 'sex', 'age_start', 'year_start',
+                               'affected_entity', 'affected_measure', 'parameter',
+                               'age_end', 'year_end'])
+    data = pd.concat([data, ckd_rr])
     key = prefix + 'relative_risk'
     write(artifact, key, data)
 
 
 def write(artifact, key, data):
-
     data = split_interval(data, interval_column='age', split_column_prefix='age')
     data = split_interval(data, interval_column='year', split_column_prefix='year')
     artifact.write(key, data)
@@ -263,11 +267,6 @@ def load_em_from_meid(meid, location):
     data = utilities.reshape(data)
     data = utilities.scrub_gbd_conventions(data, location)
     return utilities.sort_hierarchical_data(data)
-
-
-def append_ckd_rr(data, ckd_paf):
-    # TODO
-    return data
 
 
 def write_proportion_hypertensive(artifact, location):
