@@ -78,10 +78,10 @@ def aggregate(out_dir, location):
     draws = []
     for f in draw_dir.iterdir():
         draws.append(pd.read_hdf(f))
-        # f.unlink()
+        f.unlink()
 
     data = pd.concat(draws, axis=1)
-    data.to_hdf(out_dir / f'{location}.hdf')
+    data.to_hdf(out_dir / f'{location}.hdf', key='data')
     draw_dir.rmdir()
 
 
