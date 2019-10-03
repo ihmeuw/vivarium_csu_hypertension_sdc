@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm, beta
 
-from gbd_mapping import risk_factors
+from gbd_mapping import risk_factors, causes
 from vivarium import Artifact
 from vivarium.framework.artifact import get_location_term
 from vivarium.framework.artifact.hdf import EntityKey
@@ -146,7 +146,20 @@ def write_ckd_data(artifact, location):
     prevalence = load(key)
     write(artifact, key, prevalence)
 
-    # TODO: Find source for YLDs at the draw level to back calc disability weight.
+    key = 'cause.chronic_kidney_disease.disability_weight'
+    df = gbd.get_incidence_prevalence(causes.chronic_kidney_disease.gbd_id, utility_data.get_location_id(location))
+    ylds = df[df.measure_id == globals.MEASURES['YLDs']]
+    ylds = utilities.filter_data_by_restrictions(ylds, causes.chronic_kidney_disease, 'yld',
+                                                 utility_data.get_age_group_ids())
+    ylds = utilities.normalize(ylds, fill_value=0)
+    ylds = ylds.filter(globals.DEMOGRAPHIC_COLUMNS + globals.DRAW_COLUMNS)
+    ylds = utilities.reshape(ylds, value_cols=globals.DRAW_COLUMNS)
+    ylds = utilities.scrub_gbd_conventions(ylds, location)
+    ylds = utilities.sort_hierarchical_data(ylds)
+    ylds = split_interval(ylds, interval_column='age', split_column_prefix='age')
+    ylds = split_interval(ylds, interval_column='year', split_column_prefix='year')
+    dw = (ylds / prevalence).fillna(0).replace([np.inf, -np.inf], 0)
+    write(artifact, key, dw)
 
     key = 'cause.chronic_kidney_disease.excess_mortality_rate'
     emr = (csmr / prevalence).fillna(0).replace([np.inf, -np.inf], 0)
