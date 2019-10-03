@@ -25,7 +25,7 @@ def pcalculate_ckd_rr(location):
     with drmaa.Session() as s:
         jt = s.createJobTemplate()
         jt.remoteCommand = sys.executable
-        jt.nativeSpecification = '-l m_mem_free=1G,fthread=1,h_rt=00:20:00 -q all.q -P proj_csu'
+        jt.nativeSpecification = '-l m_mem_free=1.5G,fthread=1,h_rt=02:00:00 -q all.q -P proj_csu'
         jt.args = [ckd_rr.__file__, location, 'draw']
         jt.jobName = f'{location}_ckd_rr_draw'
         draw_jids = s.runBulkJobs(jt, 1, num_draws, 1)
