@@ -98,6 +98,10 @@ configuration:
             by_age: True
             by_sex: True
             by_year: False
+        chronic_kidney_disease_observer:
+            by_age: True
+            by_sex: True
+            by_year: False
         time_to_control_observer:
             by_age: True  # this is age at tx start
             by_sex: True
@@ -110,12 +114,9 @@ configuration:
         therapeutic_inertia:
             mean: 0.136
             sd: 0.0136
-        adverse_events:
-            mean: 0.1373333333
-            sd: 0.03069563849
         followup_visit_interval:
             start: 90  # days
             end: 180  # days
         treatment_ramp: fixed_dose_combination
-        followup_adherence: 0.9
+        followup_adherence: 0.7
         prescription_duration: 90  # days
