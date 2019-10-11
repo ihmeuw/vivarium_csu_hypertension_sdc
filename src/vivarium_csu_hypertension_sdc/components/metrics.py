@@ -121,6 +121,7 @@ class MedicationObserver:
         self.clock = builder.time.clock()
         self.config = builder.configuration['metrics']['medication']
         self.counts = Counter()
+        self.never_treated = pd.DataFrame(columns=HYPERTENSION_DRUGS, dtype=bool)
 
         age_sex_filter, (self.ages, self.sexes) = get_age_sex_filter_and_iterables(self.config, get_age_bins(builder))
         self.base_filter = age_sex_filter
@@ -131,12 +132,20 @@ class MedicationObserver:
         if self.config.by_sex:
             columns_required += ['sex']
         self.population_view = builder.population.get_view(columns_required)
+        builder.population.initializes_simulants(self.on_initialize_simulants,
+                                                 requires_columns=columns_required)
 
         builder.value.register_value_modifier('metrics', self.metrics)
         builder.event.register_listener('collect_metrics', self.on_collect_metrics)
 
+    def on_initialize_simulants(self, pop_data):
+        pop = self.population_view.get(pop_data.index)
+        data = pd.DataFrame(data=True, columns=HYPERTENSION_DRUGS, index=pop_data.index)
+        for drug in HYPERTENSION_DRUGS:
+            data.loc[:, drug] = pop[f'{drug}_dosage'] == 0
+        self.never_treated.append(data)
+
     def on_collect_metrics(self, event):
-        # FIXME: is the timing right here? I always get confused about whether I'm looking at things at the right time
         pop = self.population_view.get(event.index).query('alive == "alive"')
         pop = pop.loc[(self.clock() < pop.last_prescription_date) & (pop.last_prescription_date <= event.time)]
         pop['num_in_single_pill'] = pop[SINGLE_PILL_COLUMNS].sum(axis=1)
@@ -161,6 +170,11 @@ class MedicationObserver:
                 group_key = base_key.substitute(**filter_kwargs)
                 group_filter = self.base_filter.format(**filter_kwargs)
                 in_group = pop.query(group_filter) if group_filter and not pop.empty else pop
+
+                key = group_key.substitute(measure=f'{drug}_start_count')
+                just_started = in_group.loc[self.never_treated.loc[in_group, drug]]
+                self.never_treated.loc[just_started.index, drug] = False
+                drug_counts[key] = len(just_started)
 
                 # number of prescriptions of drug (at any dose)
                 key = group_key.substitute(measure=f'{drug}_prescription_count')
