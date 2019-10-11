@@ -143,7 +143,7 @@ class MedicationObserver:
         data = pd.DataFrame(data=True, columns=HYPERTENSION_DRUGS, index=pop_data.index)
         for drug in HYPERTENSION_DRUGS:
             data.loc[:, drug] = pop[f'{drug}_dosage'] == 0
-        self.never_treated.append(data)
+        self.never_treated = self.never_treated.append(data)
 
     def on_collect_metrics(self, event):
         pop = self.population_view.get(event.index).query('alive == "alive"')
@@ -170,9 +170,10 @@ class MedicationObserver:
                 group_key = base_key.substitute(**filter_kwargs)
                 group_filter = self.base_filter.format(**filter_kwargs)
                 in_group = pop.query(group_filter) if group_filter and not pop.empty else pop
-
+		
                 key = group_key.substitute(measure=f'{drug}_start_count')
-                just_started = in_group.loc[self.never_treated.loc[in_group, drug]]
+                never_treated = self.never_treated.loc[in_group.index, drug]
+                just_started = in_group.loc[never_treated]
                 self.never_treated.loc[just_started.index, drug] = False
                 drug_counts[key] = len(just_started)
 
