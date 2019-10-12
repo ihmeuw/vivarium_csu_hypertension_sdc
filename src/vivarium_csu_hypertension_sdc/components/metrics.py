@@ -434,11 +434,10 @@ class TimeToEventObserver:
 
     def on_collect_metrics(self, event):
         pop = self.population_view.get(event.index)
-
         # We only ever care about people who started treatment in the sim.
         pop = pop.loc[~pop.treatment_start_date.isna()]
         observations = self.observations.loc[pop.index]
-        pop = pop.append(observations, axis=1)
+        pop = pd.concat([pop, observations], axis=1)
 
         # First we'll do some work to determine newly controlled people
         # among the treated in the sim.
@@ -463,7 +462,7 @@ class TimeToEventObserver:
         self.observations.loc[pop.index, :] = pop.loc[:, self.observations.columns]
 
     def metrics(self, index, metrics):
-
+        import pdb; pdb.set_trace()
         return metrics
 
 
