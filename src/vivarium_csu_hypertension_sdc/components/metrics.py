@@ -463,7 +463,10 @@ class TimeToEventObserver:
         self.observations.loc[pop.index, :] = pop.loc[:, self.observations.columns]
 
     def metrics(self, index, metrics):
-
+        pop = self.population_view.get(index)
+        # We only ever care about people who started treatment in the sim.
+        pop = pop.loc[~pop.treatment_start_date.isna()]
+        metrics['treatment_start_count'] = len(pop)
         return metrics
 
 
