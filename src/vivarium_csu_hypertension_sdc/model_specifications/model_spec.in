@@ -38,7 +38,7 @@ components:
         - DiseaseCountObserver('intracerebral_hemorrhage')
         - DiseaseCountObserver('chronic_kidney_disease')
         - SBPTimeSeriesObserver()
-        #- TimeToControlObserver()
+        - TimeToEventObserver()
 
         #- SimulantTrajectoryObserver()
 
@@ -102,11 +102,6 @@ configuration:
             by_age: True
             by_sex: True
             by_year: False
-        time_to_control_observer:
-            by_age: True  # this is age at tx start
-            by_sex: True
-            by_year: False
-            measurements_to_control: 3  # number of consecutive maintenance-visit sbp measurements below 140
 
     hypertension_treatment:
         high_systolic_blood_pressure_measurement:
