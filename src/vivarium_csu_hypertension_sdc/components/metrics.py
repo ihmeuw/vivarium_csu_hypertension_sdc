@@ -170,7 +170,7 @@ class MedicationObserver:
                 group_key = base_key.substitute(**filter_kwargs)
                 group_filter = self.base_filter.format(**filter_kwargs)
                 in_group = pop.query(group_filter) if group_filter and not pop.empty else pop
-		
+
                 key = group_key.substitute(measure=f'{drug}_start_count')
                 never_treated = self.never_treated.loc[in_group.index, drug]
                 just_started = in_group.loc[never_treated]
@@ -394,86 +394,107 @@ class DiseaseCountObserver:
         return f"DiseaseCountObserver({self.disease})"
 
 
-class TimeToControlObserver:
-    configuration_defaults = {
-        'metrics': {
-            'time_to_control_observer': {
-                'by_age': True,
-                'by_year': False,
-                'by_sex': True,
-                'measurements_to_control': 3
-            }
-        }
-    }
+class TimeToEventObserver:
+    """Measures total time from treatment start to different events."""
 
     def __init__(self):
+        self.measurements_to_control = 3
         self.observations = pd.DataFrame()
+        self.diseases = ['acute_myocardial_infarction',
+                         'acute_subarachnoid_hemorrhage',
+                         'acute_intracerebral_hemorrhage',
+                         'acute_ischemic_stroke',
+                         'chronic_kidney_disease']
 
     @property
     def name(self):
         return 'time_to_control_observer'
 
     def setup(self, builder):
-        self.config = builder.configuration.metrics.time_to_control_observer
         self.age_bins = get_age_bins(builder)
-        self.population_view = builder.population.get_view(['treatment_start_date',
-                                                            'last_visit_date',
-                                                            'last_visit_type',
-                                                            'high_systolic_blood_pressure_measurement',
-                                                            'age', 'sex'])
+        treatment_cols = ['treatment_start_date', 'last_visit_date', 'last_visit_type',
+                          'high_systolic_blood_pressure_measurement']
+        disease_event_cols = [f'{disease}_event_time' for disease in self.diseases]
+        death_cols = ['alive', 'exit_time', 'cause_of_death']
+        self.population_view = builder.population.get_view(treatment_cols + disease_event_cols + death_cols)
 
-        builder.population.initializes_simulants(self.on_initialize_simulants, requires_columns=['sex'])
+        builder.population.initializes_simulants(self.on_initialize_simulants)
 
         builder.value.register_value_modifier('metrics', self.metrics)
         builder.event.register_listener('collect_metrics', self.on_collect_metrics)
 
     def on_initialize_simulants(self, pop_data):
-        pop = self.population_view.subview(['sex']).get(pop_data.index)
-        self.observations = pd.concat([pop, pd.DataFrame({'age_at_tx_start': np.nan,
-                                                          'controlled_measurements_since_tx_start': 0,
-                                                          'time_to_control': np.nan},
-                                                         index=pop_data.index)],
-                                      axis=1)
+        observations = {'control_date': pd.NaT,
+                        'controlled_measurements_since_tx_start': 0}
+        for disease in self.diseases:
+            observations[f'first_{disease}_date'] = pd.NaT
+            observations[f'death_due_to_{disease}_date'] = pd.NaT
+
+        self.observations = self.observations.append(pd.DataFrame(observations, index=pop_data.index))
 
     def on_collect_metrics(self, event):
         pop = self.population_view.get(event.index)
+        # We only ever care about people who started treatment in the sim.
+        pop = pop.loc[~pop.treatment_start_date.isna()]
+        observations = self.observations.loc[pop.index]
+        pop = pd.concat([pop, observations], axis=1)
 
-        # started treatment this time step - record their ages
-        started_tx = pop.treatment_start_date == event.time
-        self.observations.loc[pop.index[started_tx], 'age_at_tx_start'] = pop.loc[started_tx, 'age']
+        # First we'll do some work to determine newly controlled people
+        # among the treated in the sim.
+        maintenance = (pop.last_visit_date == event.time) & (pop.last_visit_type == 'maintenance')
+        was_uncontrolled = pop.control_date.isna()
+        had_good_measurement = pop.high_systolic_blood_pressure_measurement < HYPERTENSIVE_CONTROLLED_THRESHOLD
+        pop.loc[maintenance & was_uncontrolled & had_good_measurement, 'controlled_measurements_since_tx_start'] += 1
+        pop.loc[maintenance & was_uncontrolled & ~had_good_measurement, 'controlled_measurements_since_tx_start'] += 0
+        controlled = pop.controlled_measurements_since_tx_start == self.measurements_to_control
+        pop.loc[was_uncontrolled & controlled, 'control_date'] = event.time
 
-        # record sims attending a maintenance visit who haven't already reached the num measurements to control
-        maintenance_pop = (pop.last_visit_date == event.time) & (pop.last_visit_type == 'maintenance')
+        # Record first disease times and deaths since treatment start
+        died_this_step = (pop.alive == 'dead') & (pop.exit_time == event.time)
+        for disease in self.diseases:
+            no_disease_since_tx = pop[f'first_{disease}_date'].isna()
+            had_disease_event = pop[f'{disease}_event_time'] == event.time
+            pop.loc[no_disease_since_tx & had_disease_event, f'first_{disease}_date'] = event.time
 
-        not_finalized_observations = self.observations.time_to_control.isna()
-        still_to_record = self.observations.index[not_finalized_observations]
-        record_now = pop.index[maintenance_pop].intersection(still_to_record)
+            died_of_disease = pop.cause_of_death == disease
+            pop.loc[died_this_step & died_of_disease, f'death_due_to_{disease}_date'] = event.time
 
-        controlled = pop.loc[record_now, 'high_systolic_blood_pressure_measurement'] < HYPERTENSIVE_CONTROLLED_THRESHOLD
-        self.observations.loc[record_now[controlled], 'controlled_measurements_since_tx_start'] += 1
-        # start people over if they haven't reached required number and have an uncontrolled measurement
-        self.observations.loc[record_now[~controlled], 'controlled_measurements_since_tx_start'] = 0
-
-        at_required_num = ((self.observations.controlled_measurements_since_tx_start
-                            == self.config.measurements_to_control) & not_finalized_observations)
-        self.observations.loc[at_required_num, 'time_to_control'] = (event.time
-                                                                     - pop.loc[self.observations.index[at_required_num],
-                                                                               'treatment_start_date'])
+        self.observations.loc[pop.index, :] = pop.loc[:, self.observations.columns]
 
     def metrics(self, index, metrics):
-        to_report = self.observations.loc[~self.observations.time_to_control.isna()]
-        base_key = (get_output_template(**self.config.to_dict())
-                    .substitute(measure='average_time_from_tx_start_to_control'))
-        average_times = get_group_counts(to_report.rename(columns={'age_at_tx_start': 'age'}), "",  base_key,
-                                         self.config.to_dict(), self.age_bins,
-                                         aggregate=lambda df: df.time_to_control.mean())
-        metrics.update(average_times)
+        pop = self.population_view.get(index)
+        # We only ever care about people who started treatment in the sim.
+        pop = pop.loc[~pop.treatment_start_date.isna()]
+        observations = self.observations.loc[pop.index]
+        pop = pd.concat([pop, observations], axis=1)
+        metrics['treatment_start_count'] = len(pop)
+        metrics['controlled_among_treatment_started_count'] = len(pop[~pop.control_date.isna()])
+        days = ((pop.control_date - pop.treatment_start_date) / pd.Timedelta(days=1)).fillna(0).sum()
+        metrics['total_days_to_control_among_treatment_started_and_controlled'] = days
+
+        first_event = pd.Series(pd.NaT, index=pop.index)
+        for disease in self.diseases:
+            disease_event = pop[f'first_{disease}_date']
+            death = pop[f'death_due_to_{disease}_date']
+            metrics[f'tte_first_{disease}_events_among_treatment_started'] = len(pop[~disease_event.isna()])
+            days = ((disease_event - pop.treatment_start_date) / pd.Timedelta(days=1)).fillna(0).sum()
+            metrics[f'tte_total_days_to_first_{disease}_event_among_treatment_started'] = days
+            metrics[f'tte_death_due_to_{disease}_among_treatment_started'] = len(pop[~death.isna()])
+            days = ((death - pop.treatment_start_date) / pd.Timedelta(days=1)).fillna(0).sum()
+            metrics[f'tte_total_days_to_death_due_to_{disease}_among_treatment_started'] = days
+
+            both_values = ~first_event.isna() & ~disease_event.isna()
+            first_event.loc[both_values] = np.minimum(first_event.loc[both_values], disease_event.loc[both_values])
+            disease_values = first_event.isna() & ~disease_event.isna()
+            first_event.loc[disease_values] = disease_event.loc[disease_values]
+
+            both_values = ~first_event.isna() & ~death.isna()
+            first_event.loc[both_values] = np.minimum(first_event.loc[both_values], death.loc[both_values])
+            death_values = first_event.isna() & ~death.isna()
+            first_event.loc[death_values] = death.loc[death_values]
+
+        metrics[f'tte_first_disease_or_death_event_among_treatment_started'] = len(first_event[~first_event.isna()])
+        days = ((first_event - pop.treatment_start_date) / pd.Timedelta(days=1)).fillna(0).sum()
+        metrics[f'tte_total_days_to_first_disease_or_death_among_treatment_started'] = days
+
         return metrics
-
-
-
-
-
-
-
-
