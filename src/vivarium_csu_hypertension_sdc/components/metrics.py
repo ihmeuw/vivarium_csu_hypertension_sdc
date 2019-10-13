@@ -469,7 +469,7 @@ class TimeToEventObserver:
         pop = pd.concat([pop, observations], axis=1)
         metrics['treatment_start_count'] = len(pop)
         metrics['controlled_among_treatment_started_count'] = len(pop[~pop.control_date.isna()])
-        days = (pop.control_date - pop.treatment_start_date).fillna(0) / pd.Timedelta(days=1)
+        days = ((pop.control_date - pop.treatment_start_date) / pd.Timedelta(days=1)).fillna(0).sum()
         metrics['total_days_to_control_among_treatment_started_and_controlled'] = days
 
         first_event = pd.Series(pd.NaT, index=pop.index)
@@ -477,10 +477,10 @@ class TimeToEventObserver:
             disease_event = pop[f'first_{disease}_date']
             death = pop[f'death_due_to_{disease}_date']
             metrics[f'tte_first_{disease}_events_among_treatment_started'] = len(pop[~disease_event.isna()])
-            days = (disease_event - pop.treatment_start_date).fillna(0) / pd.Timedelta(days=1)
+            days = ((disease_event - pop.treatment_start_date) / pd.Timedelta(days=1)).fillna(0).sum()
             metrics[f'tte_total_days_to_first_{disease}_event_among_treatment_started'] = days
             metrics[f'tte_death_due_to_{disease}_among_treatment_started'] = len(pop[~death.isna()])
-            days = (death - pop.treatment_start_date).fillna(0) / pd.Timedelta(days=1)
+            days = ((death - pop.treatment_start_date) / pd.Timedelta(days=1)).fillna(0).sum()
             metrics[f'tte_total_days_to_death_due_to_{disease}_among_treatment_started'] = days
 
             both_values = ~first_event.isna() & ~disease_event.isna()
@@ -494,7 +494,7 @@ class TimeToEventObserver:
             first_event.loc[death_values] = death.loc[death_values]
 
         metrics[f'tte_first_disease_or_death_event_among_treatment_started'] = len(first_event[~first_event.isna()])
-        days = (first_event - pop.treatment_start_date).fillna(0) / pd.Timedelta(days=1)
+        days = ((first_event - pop.treatment_start_date) / pd.Timedelta(days=1)).fillna(0).sum()
         metrics[f'tte_total_days_to_first_disease_or_death_among_treatment_started'] = days
 
         return metrics
