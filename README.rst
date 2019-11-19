@@ -11,7 +11,7 @@ Built using [Vivarium]_ and [VivariumPublicHealth]_.
 
 Cite as
 
-James Collins, Kate Wilson, David Bernotas, & Serena Santoni.
+Kate Wilson, David Bernotas, Serena Santoni & James Collins.
 (2019, November 19). ihmeuw/vivarium_csu_hypertension_sdc: Replication Archive
 (Version v1.0). Zenodo. http://doi.org/10.5281/zenodo.3546932
 
