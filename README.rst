@@ -106,4 +106,4 @@ run simulations by, e.g.::
 The ``-v`` flag will log verbosely, so you will get log messages every time
 step. For more ways to run simulations, see the tutorials at
 https://vivarium.readthedocs.io/en/latest/tutorials/running_a_simulation/index.html
-and https://vivarium.readthedocs.io/en/latest/tutorials/exploration.html
+and https://vivarium.readthedocs.io/en/latest/tutorials/exploration.htmlB
