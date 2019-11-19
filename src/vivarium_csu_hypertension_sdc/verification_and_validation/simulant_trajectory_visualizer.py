@@ -18,13 +18,12 @@ OFFSETS = {'dr visits': -10,
 
 class SimulantTrajectoryVisualizer:
 
-    def __init__(self, results_directory, simulant_trajectory_file: str = 'simulant_trajectory.hdf'):
+    def __init__(self, results_directory, simulant_trajectory_file: str = 'simulant_trajectory.hdf', step_size=28):
         register_matplotlib_converters()
         results_path = Path(results_directory)
 
         self.data = load_data(results_path, simulant_trajectory_file)
-        model_spec = yaml.full_load((results_path / 'model_specification.yaml').open())
-        self.step_size = float(model_spec['configuration']['time']['step_size'])
+        self.step_size = float(step_size)
 
     def visualize_healthcare_utilization(self):
         v = summarize_hcu(self.data, self.step_size)

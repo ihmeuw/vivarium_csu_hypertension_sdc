@@ -19,7 +19,7 @@ class SimulantTrajectoryObserver:
         'metrics': {
             'simulant_trajectory_observer': {
                 'sample_size': 1000,
-                'path': f'/share/costeffectiveness/results/vivarium_csu_hypertension_sdc/simulant_trajectory.hdf'
+                'path': '/share/costeffectiveness/results/vivarium_csu_hypertension_sdc/simulant_trajectory.hdf'
             }
         }
     }
