@@ -1,6 +1,9 @@
-===============================
+=============================
 vivarium_csu_hypertension_sdc
-===============================
+=============================
+
+.. image:: https://zenodo.org/badge/207192257.svg
+   :target: https://zenodo.org/badge/latestdoi/207192257
 
 Research repository for the vivarium_csu_hypertension_sdc project.
 
