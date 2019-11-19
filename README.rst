@@ -7,6 +7,14 @@ vivarium_csu_hypertension_sdc
 
 Research repository for the vivarium_csu_hypertension_sdc project.
 
+Built using [Vivarium]_ and [VivariumPublicHealth]_.
+
+Cite as
+
+James Collins, Kate Wilson, David Bernotas, & Serena Santoni.
+(2019, November 19). ihmeuw/vivarium_csu_hypertension_sdc: Replication Archive
+(Version v1.0). Zenodo. http://doi.org/10.5281/zenodo.3546932
+
 .. contents::
    :depth: 1
 
@@ -110,3 +118,12 @@ The ``-v`` flag will log verbosely, so you will get log messages every time
 step. For more ways to run simulations, see the tutorials at
 https://vivarium.readthedocs.io/en/latest/tutorials/running_a_simulation/index.html
 and https://vivarium.readthedocs.io/en/latest/tutorials/exploration.htmlB
+
+.. [Vivarium] James Collins, Alec Deason, Kate Wilson, Cody Horst,
+   Kjell Swedin, Everett Mumford, & Abraham Flaxman. (2019, November 19).
+   ihmeuw/vivarium v0.9.1 (Version v0.9.1). Zenodo.
+   http://doi.org/10.5281/zenodo.3546963
+.. [VivariumPublicHealth] James Collins, Alec Deason, Everett Mumford,
+   Cody Horst, Rob Moss, Kate Wilson, … Abraham Flaxman. (2019, November 19).
+   ihmeuw/vivarium_public_health v0.10.0 (Version v0.10.0). Zenodo.
+   http://doi.org/10.5281/zenodo.3546966
