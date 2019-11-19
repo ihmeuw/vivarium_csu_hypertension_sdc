@@ -1,5 +1,7 @@
 components:
     vivarium_public_health:
+        # These components all come from the vivarium_public_health library.
+        # You can view them at https://github.com/ihmeuw/vivarium_public_health
         population:
             - BasePopulation()
             - Mortality()
@@ -12,6 +14,8 @@ components:
             - DisabilityObserver()
 
     vivarium_csu_hypertension_sdc.components:
+        # These are all defined in the components subpackage of this repository.
+        # Check the __init__ to see which module they are defined in.
         - IschemicHeartDisease()
         - Stroke('ischemic_stroke')
         - Stroke('intracerebral_hemorrhage')
@@ -46,7 +50,7 @@ configuration:
     input_data:
         location: {{ location_proper }}
         input_draw_number: 0
-        artifact_path: /share/costeffectiveness/artifacts/vivarium_csu_hypertension_sdc/{{ location_sanitized }}.hdf
+        artifact_path: {{ artifact_directory }}/{{ location_sanitized }}.hdf
     interpolation:
         order: 0
         extrapolate: True

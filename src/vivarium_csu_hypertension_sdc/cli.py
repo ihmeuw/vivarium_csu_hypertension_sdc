@@ -11,6 +11,9 @@ from vivarium.framework.utilities import handle_exceptions
 from vivarium_csu_hypertension_sdc.components import builder
 
 PROJECT_NAME = 'vivarium_csu_hypertension_sdc'
+BASE_DIR = Path(__file__).parent.resolve()
+MODEL_SPEC_DIR = BASE_DIR / 'model_specifications'
+ARTIFACT_DIR = BASE_DIR / 'artifacts'
 Location = namedtuple('Location', ['proper', 'sanitized'])
 
 
@@ -22,7 +25,6 @@ def build_htn_artifact(location):
     main(output_root, location)
 
 
-MODEL_SPEC_DIR = (Path(__file__).parent / 'model_specifications').resolve()
 @click.command()
 @click.option('-l', '--locations-file',
               type=click.Path(dir_okay=False),
@@ -72,7 +74,8 @@ def make_specs(template: str, locations_file: str, single_location: str, output_
             logger.info(f'   Writing {filespec.name}')
             outfile.write(jinja_temp.render(
                 location_proper=location.proper,
-                location_sanitized=location.sanitized))
+                location_sanitized=location.sanitized,
+                artifact_directory=str(ARTIFACT_DIR)))
 
 
 def sanitize(*locations: str) -> Iterable[Location]:
