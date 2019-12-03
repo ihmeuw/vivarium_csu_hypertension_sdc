@@ -19,6 +19,7 @@ if __name__ == "__main__":
     install_requirements = [
         'vivarium==0.9.1',
         'vivarium_public_health==0.10.0',
+        'gbd_mapping==2.1.0',
 
         # For internal ihme use.
         # 'vivarium_cluster_tools==1.0.14',
