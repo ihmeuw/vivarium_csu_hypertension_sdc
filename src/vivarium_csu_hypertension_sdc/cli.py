@@ -8,7 +8,6 @@ from jinja2 import Template
 from loguru import logger
 from vivarium.framework.utilities import handle_exceptions
 
-from vivarium_csu_hypertension_sdc.components import builder
 
 PROJECT_NAME = 'vivarium_csu_hypertension_sdc'
 BASE_DIR = Path(__file__).parent.resolve()
@@ -20,6 +19,7 @@ Location = namedtuple('Location', ['proper', 'sanitized'])
 @click.command()
 @click.argument('location')
 def build_htn_artifact(location):
+    from vivarium_csu_hypertension_sdc.components import builder
     output_root = Path(f'/share/costeffectiveness/artifacts/{PROJECT_NAME}/')
     main = handle_exceptions(builder.build_artifact, logger, with_debugger=True)
     main(output_root, location)
