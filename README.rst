@@ -22,8 +22,8 @@ Installation
 ------------
 
 You will need ``git``, ``git-lfs`` and ``conda`` to get this repository
-and install all of it's requirements.  You should follow the instructions for
-your  operating system at the following places:
+and install all of its requirements.  You should follow the instructions for
+your operating system at the following places:
 
 - `git <https://git-scm.com/downloads>`_
 - `git-lfs <https://git-lfs.github.com/>`_
@@ -37,17 +37,31 @@ all necessary requirements as follows::
   $> conda create --name=vivarium-htn python=3.6
   ...conda will download python and base dependencies...
   $> conda activate vivarium-htn
-  (vivarium-demo) $> git clone https://github.com/ihmeuw/vivarium_csu_hypertension_sdc.git
+  (vivarium-htn) $> git clone https://github.com/ihmeuw/vivarium_csu_hypertension_sdc.git
   ...git will copy the repository from github and place it in your current directory...
-  (vivarium-demo) $> cd vivarium_csu_hypertension_sdc
-  (vivarium-demo) $> pip install -e .
+  (vivarium-htn) $> cd vivarium_csu_hypertension_sdc
+  (vivarium-htn) $> pip install -e .
   ...pip will install vivarium and other requirements...
+
+
+Note the ``-e`` flag that follows pip install. This will install the python
+package in-place, which is important for making the model specifications later.
 
 Cloning the repository should take a fair bit of time as git must fetch
 the data artifact associated with the demo (about 2GB of data) from the
-large file system storage (``git-lfs``).  **If your clone works quickly,
+large file system storage (``git-lfs``). **If your clone works quickly,
 you are likely only retrieving the checksum file that github holds onto,
-and your simulations will fail.**
+and your simulations will fail.** If you are only retrieving checksum
+files you can explicitly pull the data by executing ``git-lfs pull``.
+
+Vivarium uses the Hierarchical Data Format (HDF) as the backing storage
+for the data artifacts that supply data to the simulation. You may not have
+the needed libraries on your system to interact with these files, and this is
+not something that can be specified and installed with the rest of the package's
+dependencies via ``pip``. If you encounter HDF5-related errors, you should
+install hdf tooling from within your environment like so::
+
+  (vivarium-htn) $> conda install hdf5
 
 The ``(vivarium-htn)`` that precedes your shell prompt will probably show
 up by default, though it may not.  It's just a visual reminder that you
@@ -100,7 +114,7 @@ complete description of a vivarium model. The command to generate model
 specifications is installed with this repository and it can be run
 from any directory.::
 
-  $> make_specs
+  (vivarium-htn) $> make_specs
   2019-11-18 21:30:41.429 | INFO     | vivarium_csu_hypertension_sdc.cli:make_specs:69 - Writing model spec(s) to "/REPO_INSTALLATION_DIRECTORY/vivarium_csu_hypertension_sdc/src/vivarium_csu_hypertension_sdc/model_specifications"
   2019-11-18 21:30:41.429 | INFO     | vivarium_csu_hypertension_sdc.cli:make_specs:74 -    Writing china.yaml
   2019-11-18 21:30:41.430 | INFO     | vivarium_csu_hypertension_sdc.cli:make_specs:74 -    Writing italy.yaml
@@ -112,7 +126,7 @@ As the log message indicates, the model specifications will be written to
 the ``model_specifications`` subdirectory in this repository. You can then
 run simulations by, e.g.::
 
-   $> simulate run -v /REPO_INSTALLATION_DIRECTORY/vivarium_csu_hypertension_sdc/src/vivarium_csu_hypertension_sdc/model_specifications/china.yaml
+   (vivarium-htn) $> simulate run -v /<REPO_INSTALLATION_DIRECTORY>/vivarium_csu_hypertension_sdc/src/vivarium_csu_hypertension_sdc/model_specifications/china.yaml
 
 The ``-v`` flag will log verbosely, so you will get log messages every time
 step. For more ways to run simulations, see the tutorials at
