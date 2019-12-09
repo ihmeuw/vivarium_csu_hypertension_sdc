@@ -114,7 +114,7 @@ complete description of a vivarium model. The command to generate model
 specifications is installed with this repository and it can be run
 from any directory.::
 
-  $> make_specs
+  (vivarium-htn) $> make_specs
   2019-11-18 21:30:41.429 | INFO     | vivarium_csu_hypertension_sdc.cli:make_specs:69 - Writing model spec(s) to "/REPO_INSTALLATION_DIRECTORY/vivarium_csu_hypertension_sdc/src/vivarium_csu_hypertension_sdc/model_specifications"
   2019-11-18 21:30:41.429 | INFO     | vivarium_csu_hypertension_sdc.cli:make_specs:74 -    Writing china.yaml
   2019-11-18 21:30:41.430 | INFO     | vivarium_csu_hypertension_sdc.cli:make_specs:74 -    Writing italy.yaml
@@ -126,7 +126,7 @@ As the log message indicates, the model specifications will be written to
 the ``model_specifications`` subdirectory in this repository. You can then
 run simulations by, e.g.::
 
-   $> simulate run -v /<REPO_INSTALLATION_DIRECTORY>/vivarium_csu_hypertension_sdc/src/vivarium_csu_hypertension_sdc/model_specifications/china.yaml
+   (vivarium-htn) $> simulate run -v /<REPO_INSTALLATION_DIRECTORY>/vivarium_csu_hypertension_sdc/src/vivarium_csu_hypertension_sdc/model_specifications/china.yaml
 
 The ``-v`` flag will log verbosely, so you will get log messages every time
 step. For more ways to run simulations, see the tutorials at
