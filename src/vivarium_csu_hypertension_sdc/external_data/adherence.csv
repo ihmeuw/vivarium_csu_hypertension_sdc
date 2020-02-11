@@ -1,7 +1,31 @@
 location,age_start,age_end,pill_category,mean,sd
-Global,0,45,multiple,0.5,0.174441327
-Global,45,60,multiple,0.69,0.174441327
-Global,60,125,multiple,0.88,0.174441327
-Global,0,45,single,0.629,0.2005761116
-Global,45,60,single,0.77,0.2005761116
-Global,60,125,single,0.911,0.2005761116
+China,0,45,multiple,0.167,0.116
+China,45,60,multiple,0.259,0.116
+China,60,125,multiple,0.449,0.116
+China,0,45,single,0.382,0.153
+China,45,60,single,0.450,0.153
+China,60,125,single,0.591,0.153
+Italy,0,45,multiple,0.409,0.064
+Italy,45,60,multiple,0.599,0.064
+Italy,60,125,multiple,0.789,0.064
+Italy,0,45,single,0.561,0.118
+Italy,45,60,single,0.702,0.118
+Italy,60,125,single,0.843,0.118
+South Korea,0,45,multiple,0.456,0.137
+South Korea,45,60,multiple,0.646,0.137
+South Korea,60,125,multiple,0.836,0.137
+South Korea,0,45,single,0.597,0.169
+South Korea,45,60,single,0.738,0.169
+South Korea,60,125,single,0.878,0.169
+Mexico,0,45,multiple,0.261,0.113
+Mexico,45,60,multiple,0.451,0.113
+Mexico,60,125,multiple,0.641,0.113
+Mexico,0,45,single,0.451,0.150
+Mexico,45,60,single,0.592,0.150
+Mexico,60,125,single,0.733,0.150
+Russian Federation,0,45,multiple,0.136,0.237
+Russian Federation,45,60,multiple,0.326,0.237
+Russian Federation,60,125,multiple,0.513,0.237
+Russian Federation,0,45,single,0.359,0.257
+Russian Federation,45,60,single,0.500,0.257
+Russian Federation,60,125,single,0.641,0.257
