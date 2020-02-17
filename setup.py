@@ -22,8 +22,8 @@ if __name__ == "__main__":
         'gbd_mapping==2.1.0',
 
         # For internal ihme use.
-        # 'vivarium_cluster_tools==1.0.14',
-        # 'vivarium_inputs[data]==3.0.1',
+        'vivarium_cluster_tools==1.0.14',
+        'vivarium_inputs[data]==3.1.1',
 
         # These are pinned for internal dependencies on IHME libraries
         'numpy<=1.15.4',

@@ -11,7 +11,7 @@ from vivarium.framework.artifact import get_location_term
 from vivarium.framework.artifact.hdf import EntityKey
 from vivarium_gbd_access import gbd
 from vivarium_inputs.data_artifact.loaders import loader
-from vivarium_inputs.data_artifact.utilities import split_interval
+from vivarium_inputs.utilities import split_interval
 from vivarium_inputs import utilities, globals, utility_data, core
 
 from vivarium_csu_hypertension_sdc.external_data.proportion_hypertensive import HYPERTENSION_DATA_FOLDER, HYPERTENSION_HDF_KEY
@@ -53,10 +53,10 @@ def write_demographic_data(artifact, location):
     measures = ["structure", "age_bins", "theoretical_minimum_risk_life_expectancy", "demographic_dimensions"]
     for m in measures:
         key = prefix + m
-        write(artifact, key, load(key))
+        artifact.write(artifact, key, load(key))
 
     key = 'cause.all_causes.cause_specific_mortality_rate'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
 
 
 def write_ihd_data(artifact, location):
@@ -64,20 +64,21 @@ def write_ihd_data(artifact, location):
 
     # Metadata
     key = 'cause.ischemic_heart_disease.sequelae'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
     key = 'cause.ischemic_heart_disease.restrictions'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
 
     # Measures for Disease Model
     key = 'cause.ischemic_heart_disease.cause_specific_mortality_rate'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
 
     # Measures for Disease States
     mi = ['acute_myocardial_infarction_first_2_days', 'acute_myocardial_infarction_3_to_28_days']
     p, dw = load_prev_dw(mi, location)
-    write(artifact, 'sequela.acute_myocardial_infarction.prevalence', p)
-    write(artifact, 'sequela.acute_myocardial_infarction.disability_weight', dw)
-    write(artifact, 'sequela.acute_myocardial_infarction.excess_mortality_rate', load_em_from_meid(1814, location))
+    artifact.write(artifact, 'sequela.acute_myocardial_infarction.prevalence', p)
+    artifact.write(artifact, 'sequela.acute_myocardial_infarction.disability_weight', dw)
+    artifact.write(artifact, 'sequela.acute_myocardial_infarction.excess_mortality_rate',
+                   load_em_from_meid(1814, location))
 
     post_mi = ['mild_angina_due_to_ischemic_heart_disease',
                'moderate_angina_due_to_ischemic_heart_disease',
@@ -90,13 +91,14 @@ def write_ihd_data(artifact, location):
                'controlled_medically_managed_heart_failure_due_ischemic_heart_disease']
 
     p, dw = load_prev_dw(post_mi, location)
-    write(artifact, 'sequela.post_myocardial_infarction.prevalence', p)
-    write(artifact, 'sequela.post_myocardial_infarction.disability_weight', dw)
-    write(artifact, 'sequela.post_myocardial_infarction.excess_mortality_rate', load_em_from_meid(15755, location))
+    artifact.write(artifact, 'sequela.post_myocardial_infarction.prevalence', p)
+    artifact.write(artifact, 'sequela.post_myocardial_infarction.disability_weight', dw)
+    artifact.write(artifact, 'sequela.post_myocardial_infarction.excess_mortality_rate',
+                   load_em_from_meid(15755, location))
 
     # Measures for Transitions
     key = 'cause.ischemic_heart_disease.incidence_rate'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
 
 
 def write_stroke_data(artifact, location, stroke_name, acute_meid, post_meid):
@@ -104,29 +106,31 @@ def write_stroke_data(artifact, location, stroke_name, acute_meid, post_meid):
 
     # Metadata
     key = f'cause.{stroke_name}.sequelae'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
     key = f'cause.{stroke_name}.restrictions'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
     # Measures for Disease Model
     key = f'cause.{stroke_name}.cause_specific_mortality_rate'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
 
     # Measures for Disease States
     acute = [f'acute_{stroke_name}_severity_level_{i}' for i in range(1, 6)]
     p, dw = load_prev_dw(acute, location)
-    write(artifact, f'sequela.acute_{stroke_name}.prevalence', p)
-    write(artifact, f'sequela.acute_{stroke_name}.disability_weight', dw)
-    write(artifact, f'sequela.acute_{stroke_name}.excess_mortality_rate', load_em_from_meid(acute_meid, location))
+    artifact.write(artifact, f'sequela.acute_{stroke_name}.prevalence', p)
+    artifact.write(artifact, f'sequela.acute_{stroke_name}.disability_weight', dw)
+    artifact.write(artifact, f'sequela.acute_{stroke_name}.excess_mortality_rate',
+                   load_em_from_meid(acute_meid, location))
 
     post = [f'chronic_{stroke_name}_severity_level_{i}' for i in range(1, 6)] + [f'asymptomatic_chronic_{stroke_name}']
     p, dw = load_prev_dw(post, location)
-    write(artifact, f'sequela.post_{stroke_name}.prevalence', p)
-    write(artifact, f'sequela.post_{stroke_name}.disability_weight', dw)
-    write(artifact, f'sequela.post_{stroke_name}.excess_mortality_rate', load_em_from_meid(post_meid, location))
+    artifact.write(artifact, f'sequela.post_{stroke_name}.prevalence', p)
+    artifact.write(artifact, f'sequela.post_{stroke_name}.disability_weight', dw)
+    artifact.write(artifact, f'sequela.post_{stroke_name}.excess_mortality_rate',
+                   load_em_from_meid(post_meid, location))
 
     # Measures for Transitions
     key = f'cause.{stroke_name}.incidence_rate'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
 
 
 def write_ckd_data(artifact, location):
@@ -134,17 +138,17 @@ def write_ckd_data(artifact, location):
 
     # Metadata
     key = f'cause.chronic_kidney_disease.restrictions'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
 
     # Measures for Disease Model
     key = f'cause.chronic_kidney_disease.cause_specific_mortality_rate'
     csmr = load(key)
-    write(artifact, key, csmr.copy())
+    artifact.write(artifact, key, csmr.copy())
 
     # Measures for Disease States
     key = 'cause.chronic_kidney_disease.prevalence'
     prevalence = load(key)
-    write(artifact, key, prevalence.copy())
+    artifact.write(artifact, key, prevalence.copy())
 
     key = 'cause.chronic_kidney_disease.disability_weight'
     df = gbd.get_incidence_prevalence(causes.chronic_kidney_disease.gbd_id, utility_data.get_location_id(location))
@@ -155,17 +159,19 @@ def write_ckd_data(artifact, location):
     ylds = ylds.filter(globals.DEMOGRAPHIC_COLUMNS + globals.DRAW_COLUMNS)
     ylds = utilities.reshape(ylds, value_cols=globals.DRAW_COLUMNS)
     ylds = utilities.scrub_gbd_conventions(ylds, location)
+    ylds = split_interval(ylds, interval_column='age', split_column_prefix='age')
+    ylds = split_interval(ylds, interval_column='year', split_column_prefix='year')
     ylds = utilities.sort_hierarchical_data(ylds)
     dw = (ylds / prevalence).fillna(0).replace([np.inf, -np.inf], 0)
-    write(artifact, key, dw)
+    artifact.write(artifact, key, dw)
 
     key = 'cause.chronic_kidney_disease.excess_mortality_rate'
     emr = (csmr / prevalence).fillna(0).replace([np.inf, -np.inf], 0)
-    write(artifact, key, emr)
+    artifact.write(artifact, key, emr)
 
     # Measures for Transitions
     key = 'cause.chronic_kidney_disease.incidence_rate'
-    write(artifact, key, load(key))
+    artifact.write(artifact, key, load(key))
 
 
 def write_sbp_data(artifact, location):
@@ -182,7 +188,7 @@ def write_sbp_data(artifact, location):
                 "exposure_distribution_weights"]
     for m in measures:
         key = prefix + m
-        write(artifact, key, load(key))
+        artifact.write(artifact, key, load(key))
 
     sbp = risk_factors.high_systolic_blood_pressure
 
@@ -202,10 +208,12 @@ def write_sbp_data(artifact, location):
     data = data.filter(globals.DEMOGRAPHIC_COLUMNS + ['affected_entity', 'affected_measure'] + globals.DRAW_COLUMNS)
     data = utilities.reshape(data)
     data = utilities.scrub_gbd_conventions(data, location)
+    data = split_interval(data, interval_column='age', split_column_prefix='age')
+    data = split_interval(data, interval_column='year', split_column_prefix='year')
     data = utilities.sort_hierarchical_data(data)
 
     key = prefix + 'population_attributable_fraction'
-    write(artifact, key, data)
+    artifact.write(artifact, key, data)
 
     data = gbd.get_relative_risk(sbp.gbd_id, utility_data.get_location_id(location))
     data = utilities.convert_affected_entity(data, 'cause_id')
@@ -245,12 +253,6 @@ def write_sbp_data(artifact, location):
     artifact.write(key, data)
 
 
-def write(artifact, key, data):
-    data = split_interval(data, interval_column='age', split_column_prefix='age')
-    data = split_interval(data, interval_column='year', split_column_prefix='year')
-    artifact.write(key, data)
-
-
 def get_load(location):
     return lambda key: loader(EntityKey(key), location, set())
 
@@ -280,6 +282,8 @@ def load_em_from_meid(meid, location):
     data = data.filter(globals.DEMOGRAPHIC_COLUMNS + globals.DRAW_COLUMNS)
     data = utilities.reshape(data)
     data = utilities.scrub_gbd_conventions(data, location)
+    data = split_interval(data, interval_column='age', split_column_prefix='age')
+    data = split_interval(data, interval_column='year', split_column_prefix='year')
     return utilities.sort_hierarchical_data(data)
 
 
@@ -287,7 +291,9 @@ def write_proportion_hypertensive(artifact, location):
     location = location.replace(' ', '_').replace("'", "-").lower()
     data = pd.read_hdf(HYPERTENSION_DATA_FOLDER / f'{location}.hdf', HYPERTENSION_HDF_KEY)
     key = f'risk_factor.high_systolic_blood_pressure.{HYPERTENSION_HDF_KEY}'
-    write(artifact, key, data)
+    data = split_interval(data, interval_column='age', split_column_prefix='age')
+    data = split_interval(data, interval_column='year', split_column_prefix='year')
+    artifact.write(artifact, key, data)
 
 
 def write_hypertension_medication_data(artifact, location):
@@ -332,7 +338,9 @@ def write_hypertension_medication_data(artifact, location):
             data = data.divide(data.sum(axis=0), axis=1)
 
         key = f'health_technology.hypertension_medication.{k}'
-        write(artifact, key, data)
+        data = split_interval(data, interval_column='age', split_column_prefix='age')
+        data = split_interval(data, interval_column='year', split_column_prefix='year')
+        artifact.write(artifact, key, data)
 
 
 def generate_draws(data, seed_columns, distribution_type):
@@ -393,7 +401,23 @@ def str_to_seed(s):
 
 
 def write_utilization_rate(artifact, location):
-    load = get_load(location)
     key = 'healthcare_entity.outpatient_visits.utilization_rate'
-    data = load(key)
-    write(artifact, key, data)
+    from vivarium_csu_hypertension_sdc import external_data
+    data_dir = Path(external_data.__file__).parent
+    data = pd.read_csv(data_dir / f'outpatient_utilization.csv')
+    loc_id = utility_data.get_location_id(location)
+    data = data[data.location_id == loc_id].reset_index(drop=True)
+    data['log_mean'] = np.log(data['outpatient_visits_per_cap_mean'])
+    data['log_sd'] = (np.log(data['outpatient_visits_per_cap_95_upper'])
+                      - np.log(data['outpatient_visits_per_cap_95_lower'])) / 1.96
+    draws = np.exp(np.random.normal(loc=data['log_mean'], scale=data['log_sd'], size=(1000, len(data)))).T
+    draws = pd.DataFrame(data=draws, columns=globals.DRAW_COLUMNS)
+    data = pd.concat([data[['location_id', 'sex_id', 'age_group_id', 'year_id']], draws], axis=1)
+    data = utilities.normalize(data, fill_value=0)
+    data = data.filter(globals.DEMOGRAPHIC_COLUMNS + globals.DRAW_COLUMNS)
+    data = utilities.reshape(data)
+    data = utilities.scrub_gbd_conventions(data, location)
+    data = split_interval(data, interval_column='age', split_column_prefix='age')
+    data = split_interval(data, interval_column='year', split_column_prefix='year')
+    data = utilities.sort_hierarchical_data(data)
+    artifact.write(artifact, key, data)
