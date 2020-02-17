@@ -326,6 +326,7 @@ class SBPTimeSeriesObserver:
             sbp = self.sbp(pop.index)
 
             treated = pop[DOSAGE_COLUMNS].sum(axis=1) > 0
+            self.sbp_time_series[f'average_sbp_among_all_in_{event.time.year}'] = sbp.mean()
             self.sbp_time_series[f'average_sbp_among_treated_in_{event.time.year}'] = sbp.loc[treated].mean()
             self.sbp_time_series[f'average_sbp_among_untreated_in_{event.time.year}'] = sbp.loc[~treated].mean()
 
