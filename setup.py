@@ -18,7 +18,7 @@ if __name__ == "__main__":
 
     install_requirements = [
         'vivarium==0.9.3',
-        'vivarium_public_health==0.10.0',
+        'vivarium_public_health==0.10.4',
         'gbd_mapping==2.1.0',
 
         # These are pinned for internal dependencies on IHME libraries
