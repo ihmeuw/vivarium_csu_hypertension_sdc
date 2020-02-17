@@ -171,7 +171,13 @@ def write_ckd_data(artifact, location):
 
     # Measures for Transitions
     key = 'cause.chronic_kidney_disease.incidence_rate'
-    artifact.write(key, load(key))
+    data = core.get_data(causes.chronic_kidney_disease, 'incidence_rate', location)
+    data = utilities.scrub_gbd_conventions(data, location)
+    data = utilities.split_interval(data, interval_column='age', split_column_prefix='age')
+    data = utilities.split_interval(data, interval_column='year', split_column_prefix='year')
+    data = utilities.sort_hierarchical_data(data)
+    data[data > 50] = 50  # Russia has absurdly high values in some of the data and it breaks validation.
+    artifact.write(key, data)
 
 
 def write_sbp_data(artifact, location):
