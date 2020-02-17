@@ -2,5 +2,5 @@ include AUTHORS.rst
 include LICENSE
 include README.rst
 
-recursive-include src/vivarium_csu_hypertension_sdc *.py *.yaml *.ipynb *.csv
+recursive-include src/vivarium_csu_hypertension_sdc *.py *.yaml *.ipynb *.csv *.txt *.in
 recursive-include tests *.py *txt *.yaml
